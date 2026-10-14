@@ -8,10 +8,10 @@ using System.Net.Http.Json;
 //
 //   dotnet run -c Release --project tools/Ingest.DemoClient -- [--url http://localhost:8080] [--access-url http://localhost:8081]
 //       [--client-id demo-admin] [--client-secret ...] [--items 50000] [--batch-size 5000]
-var url = Arg("--url", "http://localhost:8080");
+var url = Arg("--url", $"http://localhost:{Environment.GetEnvironmentVariable("INGEST_PORT") ?? "8080"}");
 var total = int.Parse(Arg("--items", "50000"), CultureInfo.InvariantCulture);
 var batchSize = int.Parse(Arg("--batch-size", "5000"), CultureInfo.InvariantCulture);
-var accessUrl = Arg("--access-url", "http://localhost:8081");
+var accessUrl = Arg("--access-url", $"http://localhost:{Environment.GetEnvironmentVariable("ACCESS_PORT") ?? "8081"}");
 var clientId = Arg("--client-id", "demo-admin");
 var clientSecret = Arg("--client-secret", "local-dev-only-client-secret");
 

@@ -37,7 +37,9 @@ You only need Docker:
 docker compose up --build
 ```
 
-This starts SQL Server, Redis, RabbitMQ (management UI on port 15672, guest/guest), the access service (port 8081), the ingest service (port 8080), the payments service (port 8082), the legacy monolith (port 8083), the YARP gateway (port 8000) in front of all of them, and the Aspire dashboard for traces, metrics and logs (http://localhost:18888). Every example below also works through the gateway: swap the port for 8000. It also seeds a demo tenant on the Pro plan, with an API client whose credentials are local-only values from `docker-compose.yml`.
+This starts SQL Server, Redis, RabbitMQ, the access service (port 8081), the ingest service (port 8080), the payments service (port 8082), the legacy monolith (port 8083), the YARP gateway (port 8000) in front of all of them, and the Aspire dashboard for traces, metrics and logs (http://localhost:18888). Every example below also works through the gateway: swap the port for 8000.
+
+All ports are published on `127.0.0.1` only and can be changed: copy [`.env.example`](.env.example) to `.env` and edit it. SQL Server, Redis and RabbitMQ use non-standard host ports so they don't clash with local installs: SQL Server `localhost,14333` (sa / `Local_dev_only_1`), Redis `localhost:16379`, RabbitMQ AMQP `localhost:15682` and its management UI http://localhost:15683 (guest/guest). Inside compose the containers use service names and their normal ports (`sqlserver:1433`, `rabbitmq:5672`, ...). The smoke script, the k6 scripts and the demo client read the same variables (`INGEST_PORT`, `ACCESS_PORT`, ...).
 
 Get a token, then send a batch with one valid and one invalid row:
 
@@ -178,6 +180,13 @@ Why it's built this way: [ADR 0001: TVP + MERGE](ArggonManager/docs/adr/0001-bat
 ```bash
 dotnet test   # needs Docker for the integration tests
 ```
+
+The tests start their own SQL Server, Redis and RabbitMQ containers on random free ports (Testcontainers), so they don't need `docker compose` and don't clash with it or with local installs.
+
+### Troubleshooting
+
+- **`Bind for 127.0.0.1:<port> failed: port is already allocated`**: something on your machine already uses that port. Copy `.env.example` to `.env`, change the matching variable (for example `INGEST_PORT=18080`), and run `docker compose up --build` again. For the scripts, export the same variable or keep the `.env` file: `scripts/smoke.sh` loads it.
+- **Ports 8080-8083 or 8000 are taken by other dev servers**: same fix; only the host side changes, the services keep talking to each other on their internal ports.
 
 ## Stack
 

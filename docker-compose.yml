@@ -1,4 +1,8 @@
 # One command: docker compose up --build
+# Host ports are published on 127.0.0.1 only and can be changed in .env (see .env.example).
+# SQL Server, Redis and RabbitMQ use non-standard host ports so they don't clash with local installs.
+# Containers talk to each other by service name and container port (sqlserver:1433, redis:6379,
+# rabbitmq:5672, ingest-api:8080, ...), never through these host ports.
 # Local only. Every password, key and secret below is a throwaway dev value, never a real secret.
 services:
   sqlserver:
@@ -8,7 +12,7 @@ services:
       MSSQL_SA_PASSWORD: "Local_dev_only_1"
       MSSQL_PID: Developer
     ports:
-      - "1433:1433"
+      - "127.0.0.1:${SQL_PORT:-14333}:1433"
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
       interval: 5s
@@ -28,7 +32,7 @@ services:
       Ingest__MaxBatchSize: "5000"
       Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${INGEST_PORT:-8080}:8080"
     restart: on-failure
     depends_on:
       rabbitmq:
@@ -38,6 +42,8 @@ services:
 
   redis:
     image: redis:7.4-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-16379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -61,7 +67,7 @@ services:
       Access__Seed__AdminClientId: "demo-admin"
       Access__Seed__AdminClientSecret: "local-dev-only-client-secret"
     ports:
-      - "8081:8080"
+      - "127.0.0.1:${ACCESS_PORT:-8081}:8080"
     restart: on-failure
     depends_on:
       sqlserver:
@@ -74,7 +80,8 @@ services:
   rabbitmq:
     image: rabbitmq:4.1-management-alpine
     ports:
-      - "15672:15672" # management UI, guest/guest (local only)
+      - "127.0.0.1:${RABBITMQ_PORT:-15682}:5672"
+      - "127.0.0.1:${RABBITMQ_UI_PORT:-15683}:15672" # management UI, guest/guest (local only)
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -92,7 +99,7 @@ services:
       Messaging__Uri: "amqp://guest:guest@rabbitmq:5672"
       Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
     ports:
-      - "8082:8080"
+      - "127.0.0.1:${PAYMENTS_PORT:-8082}:8080"
     restart: on-failure
     depends_on:
       sqlserver:
@@ -111,7 +118,7 @@ services:
       ConnectionStrings__Items: "Server=sqlserver,1433;Database=batchyard;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
       Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
     ports:
-      - "8083:8080"
+      - "127.0.0.1:${LEGACY_PORT:-8083}:8080"
     restart: on-failure
     depends_on:
       sqlserver:
@@ -133,7 +140,7 @@ services:
       ReverseProxy__Clusters__payments__Destinations__d1__Address: "http://payments-api:8080/"
       ReverseProxy__Clusters__legacy__Destinations__d1__Address: "http://legacy-monolith:8080/"
     ports:
-      - "8000:8080"
+      - "127.0.0.1:${GATEWAY_PORT:-8000}:8080"
     depends_on:
       - ingest-api
       - access-api
@@ -141,9 +148,9 @@ services:
       - legacy-monolith
 
   aspire-dashboard:
-    # Traces, metrics and logs from every service (ADR 0016). UI: http://localhost:18888 (no login, local only).
+    # Traces, metrics and logs from every service (ADR 0016). UI: http://localhost:${DASHBOARD_PORT:-18888} (no login, local only).
     image: mcr.microsoft.com/dotnet/aspire-dashboard:13.0
     environment:
       DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
     ports:
-      - "18888:18888"
+      - "127.0.0.1:${DASHBOARD_PORT:-18888}:18888"
