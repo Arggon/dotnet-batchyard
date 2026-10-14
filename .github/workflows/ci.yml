@@ -90,6 +90,9 @@ jobs:
       - name: Smoke test
         run: ./scripts/smoke.sh
 
+      - name: Dashboard shows the traces
+        run: python3 scripts/check-traces.py
+
       - name: Logs on failure
         if: failure()
         run: docker compose logs

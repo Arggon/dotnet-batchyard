@@ -149,7 +149,7 @@ services:
 
   aspire-dashboard:
     # Traces, metrics and logs from every service (ADR 0016). UI: http://localhost:${DASHBOARD_PORT:-18888} (no login, local only).
-    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.0
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6.1 # 13.2+ serves the telemetry API scripts/check-traces.py reads
     environment:
       DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
     ports:
