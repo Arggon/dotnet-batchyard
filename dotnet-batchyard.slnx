@@ -3,12 +3,14 @@
     <Project Path="benchmarks/Ingest.Benchmarks/Ingest.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Access.Api/Access.Api.csproj" />
     <Project Path="src/Access.Data/Access.Data.csproj" />
     <Project Path="src/BuildingBlocks/BuildingBlocks.csproj" />
     <Project Path="src/Ingest.Api/Ingest.Api.csproj" />
     <Project Path="src/Ingest.Data/Ingest.Data.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Access.ApiTests/Access.ApiTests.csproj" />
     <Project Path="tests/Access.IntegrationTests/Access.IntegrationTests.csproj" />
     <Project Path="tests/Architecture.Tests/Architecture.Tests.csproj" />
     <Project Path="tests/Ingest.IntegrationTests/Ingest.IntegrationTests.csproj" />
