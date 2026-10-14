@@ -16,8 +16,11 @@ k6 script that runs the same batch load against the legacy route and the ingest 
 
 ## Acceptance
 
-- [ ] benchmarks/k6/strangler.js
-- [ ] Measured results with environment in docs/benchmarks.md
-- [ ] On-demand workflow job
+- [x] benchmarks/k6/strangler.js
+- [x] Measured results with environment in docs/benchmarks.md
+- [x] On-demand workflow job
 
 ## Notes
+
+### 2026-10-14 @Arggon
+Done-gate evidence: shipped in PR #23, landed on main via #26 (d7e18fa). main CI green at 43d80b5: ci https://github.com/Arggon/dotnet-batchyard/actions/runs/38561095595 , codeql .../runs/38561095612 , arggon .../runs/38561095609. Acceptance boxes ticked after checking each against main.

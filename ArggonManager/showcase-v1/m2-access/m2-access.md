@@ -20,3 +20,6 @@ Milestone 2: the generic version of "a new access role that enabled AWS Marketpl
 - [ ] Story m2-ingest-auth accepted
 
 ## Notes
+
+### 2026-10-14 @Arggon
+Awaiting Gonzalo: every task under this epic is done. The 'Story … accepted' boxes stay unticked until the stories are accepted.
