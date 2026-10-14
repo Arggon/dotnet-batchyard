@@ -6,9 +6,7 @@ namespace Ingest.IntegrationTests;
 /// <summary>One real SQL Server container per test run, migrated once. Tests isolate data by tenant id.</summary>
 public sealed class SqlServerFixture : IAsyncLifetime
 {
-    private readonly MsSqlContainer _container = new MsSqlBuilder()
-        .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
-        .Build();
+    private readonly MsSqlContainer _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
 
     public string ConnectionString { get; private set; } = "";
 
@@ -27,7 +25,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
 }
 
 [CollectionDefinition(Name)]
-public sealed class SqlServerCollection : ICollectionFixture<SqlServerFixture>
+public sealed class SqlServerTests : ICollectionFixture<SqlServerFixture>
 {
     public const string Name = "sql-server";
 }

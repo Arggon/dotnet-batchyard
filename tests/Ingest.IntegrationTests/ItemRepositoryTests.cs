@@ -2,7 +2,7 @@ using Ingest.Data;
 
 namespace Ingest.IntegrationTests;
 
-[Collection(SqlServerCollection.Name)]
+[Collection(SqlServerTests.Name)]
 public class ItemRepositoryTests(SqlServerFixture db)
 {
     private readonly SqlItemRepository _repository = new(db.ConnectionString);
