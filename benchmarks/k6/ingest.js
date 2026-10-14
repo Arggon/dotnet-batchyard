@@ -10,8 +10,8 @@ import { check } from 'k6';
 import { Counter } from 'k6/metrics';
 import exec from 'k6/execution';
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
-const ACCESS_URL = __ENV.ACCESS_URL || 'http://localhost:8081';
+const BASE_URL = __ENV.BASE_URL || `http://localhost:${__ENV.INGEST_PORT || '8080'}`;
+const ACCESS_URL = __ENV.ACCESS_URL || `http://localhost:${__ENV.ACCESS_PORT || '8081'}`;
 const CLIENT_ID = __ENV.CLIENT_ID || 'demo-admin';
 const CLIENT_SECRET = __ENV.CLIENT_SECRET || 'local-dev-only-client-secret';
 const DURATION = __ENV.DURATION || '30s';

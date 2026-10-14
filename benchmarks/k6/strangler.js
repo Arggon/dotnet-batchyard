@@ -11,10 +11,10 @@ import { check } from 'k6';
 import { Counter } from 'k6/metrics';
 import exec from 'k6/execution';
 
-const LEGACY_URL = __ENV.LEGACY_URL || 'http://localhost:8083';
-const SERVICE_URL = __ENV.SERVICE_URL || 'http://localhost:8080';
-const GATEWAY_URL = __ENV.GATEWAY_URL || 'http://localhost:8000';
-const ACCESS_URL = __ENV.ACCESS_URL || 'http://localhost:8081';
+const LEGACY_URL = __ENV.LEGACY_URL || `http://localhost:${__ENV.LEGACY_PORT || '8083'}`;
+const SERVICE_URL = __ENV.SERVICE_URL || `http://localhost:${__ENV.INGEST_PORT || '8080'}`;
+const GATEWAY_URL = __ENV.GATEWAY_URL || `http://localhost:${__ENV.GATEWAY_PORT || '8000'}`;
+const ACCESS_URL = __ENV.ACCESS_URL || `http://localhost:${__ENV.ACCESS_PORT || '8081'}`;
 const CLIENT_ID = __ENV.CLIENT_ID || 'demo-admin';
 const CLIENT_SECRET = __ENV.CLIENT_SECRET || 'local-dev-only-client-secret';
 const DURATION = __ENV.DURATION || '30s';

@@ -34,7 +34,7 @@ public static class MessagingTelemetry
 public sealed class MessagingOptions
 {
     /// <summary>AMQP URI, for example amqp://guest:guest@rabbitmq:5672.</summary>
-    public string Uri { get; set; } = "amqp://guest:guest@localhost:5672";
+    public string Uri { get; set; } = "amqp://guest:guest@localhost:15682"; // compose host port; containers set rabbitmq:5672
 
     /// <summary>Topic exchange every service publishes to (ADR 0011).</summary>
     public string Exchange { get; set; } = "batchyard.events";

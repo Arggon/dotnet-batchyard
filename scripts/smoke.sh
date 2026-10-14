@@ -2,11 +2,13 @@
 # Smoke test against a running stack (docker compose up). Used by CI; handy locally too.
 # Uses the demo client seeded by docker-compose.yml (local-only credentials).
 set -euo pipefail
-BASE_URL="${BASE_URL:-http://localhost:8080}"
-ACCESS_URL="${ACCESS_URL:-http://localhost:8081}"
-PAYMENTS_URL="${PAYMENTS_URL:-http://localhost:8082}"
-LEGACY_URL="${LEGACY_URL:-http://localhost:8083}"
-GATEWAY_URL="${GATEWAY_URL:-http://localhost:8000}"
+# Ports follow docker-compose.yml defaults; override with the same variables as .env (e.g. INGEST_PORT).
+[ -f .env ] && set -a && . ./.env && set +a
+BASE_URL="${BASE_URL:-http://localhost:${INGEST_PORT:-8080}}"
+ACCESS_URL="${ACCESS_URL:-http://localhost:${ACCESS_PORT:-8081}}"
+PAYMENTS_URL="${PAYMENTS_URL:-http://localhost:${PAYMENTS_PORT:-8082}}"
+LEGACY_URL="${LEGACY_URL:-http://localhost:${LEGACY_PORT:-8083}}"
+GATEWAY_URL="${GATEWAY_URL:-http://localhost:${GATEWAY_PORT:-8000}}"
 CLIENT_ID="${CLIENT_ID:-demo-admin}"
 CLIENT_SECRET="${CLIENT_SECRET:-local-dev-only-client-secret}"
 
@@ -75,5 +77,5 @@ b=$(backend_of "$GATEWAY_URL/v1/reports/stock" -H "Authorization: Bearer $token"
 b=$(backend_of "$GATEWAY_URL/v1/payments" -H "Authorization: Bearer $token")
 [ "$b" = "payments" ] || { echo "gateway sent payments to '$b'" >&2; exit 1; }
 echo "gateway routes ok (batch -> ingest, report -> legacy, payments -> payments)"
-curl -fsS -o /dev/null http://localhost:18888 && echo "aspire dashboard up"
+curl -fsS -o /dev/null "http://localhost:${DASHBOARD_PORT:-18888}" && echo "aspire dashboard up"
 echo "smoke test passed"
