@@ -27,6 +27,7 @@ public sealed class PaymentsFixture : IAsyncLifetime
         {
             host.UseSetting("ConnectionStrings:Payments", ConnectionString);
             host.UseSetting("Jwt:SigningKey", SigningKey);
+            host.UseSetting("Messaging:Enabled", "false");
             host.UseSetting("Gateway:BaseDelay", "00:00:00.010");
             host.UseSetting("Gateway:AttemptTimeout", "00:00:00.500");
         });

@@ -7,5 +7,6 @@
     <ProjectReference Include="..\..\src\Ingest.Data\Ingest.Data.csproj" />
     <ProjectReference Include="..\..\src\Access.Data\Access.Data.csproj" />
     <ProjectReference Include="..\..\src\Payments.Application\Payments.Application.csproj" />
+    <ProjectReference Include="..\..\src\BuildingBlocks.Messaging\BuildingBlocks.Messaging.csproj" />
   </ItemGroup>
 </Project>

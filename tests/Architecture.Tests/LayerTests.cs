@@ -36,4 +36,15 @@ public class LayerTests
 
         result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    [Fact]
+    public void Messaging_building_block_is_service_agnostic()
+    {
+        var result = Types.InAssembly(typeof(BuildingBlocks.Messaging.IntegrationMessage).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny("Payments", "Access", "Ingest", "Microsoft.AspNetCore")
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }
