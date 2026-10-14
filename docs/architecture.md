@@ -1,8 +1,8 @@
 # Architecture
 
-Two views: the system as it is today (milestone 2), and the full target from the roadmap. Solid boxes exist in the code; dashed boxes are planned.
+Two views: the system as it is today (milestone 3), and the full target from the roadmap. Solid boxes exist in the code; dashed boxes are planned.
 
-## Today (M2)
+## Today (M3)
 
 ```mermaid
 flowchart LR
@@ -11,15 +11,23 @@ flowchart LR
     subgraph compose [docker compose]
         access["Access.Api :8081<br/>token, plans, roles, permissions"]
         api["Ingest.Api :8080<br/>items, batches"]
-        db[("SQL Server 2022<br/>batchyard (items)<br/>batchyard_access (catalog, clients)")]
+        payments["Payments.Api :8082<br/>commands + queries via mediator"]
+        db[("SQL Server 2022<br/>batchyard (items)<br/>batchyard_access (catalog, outbox)<br/>batchyard_payments (write, outbox, read model)")]
         redis[("Redis<br/>permission cache")]
+        mq{{"RabbitMQ<br/>exchange batchyard.events"}}
     end
     client -->|"1. POST /v1/auth/token"| access
     client -->|"2. Bearer JWT<br/>POST /v1/items:batch"| api
+    client -->|"Bearer JWT<br/>invoices, capture, refund"| payments
     market -->|"subscribe / unsubscribe"| access
     access -->|EF Core| db
     access -->|cache-aside| redis
     api -->|"Dapper: stored procedures,<br/>one TVP per batch"| db
+    payments -->|Dapper| db
+    payments -->|"outbox: payment.captured / refunded"| mq
+    access -->|"outbox: plan.changed"| mq
+    mq -->|"queue payments.read-model"| payments
+    mq -->|"queue access.cache → bump generation"| access
 ```
 
 Ingest never calls Access. It validates the token's signature and reads `tenant_id`, `perm` and `max_batch` from it (ADR 0006).
@@ -65,6 +73,34 @@ sequenceDiagram
     A-->>C: 200 {created, updated, rejected, results[] in input order}
 ```
 
+### Inside the payments service
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as Payments.Api
+    participant M as Mediator pipeline
+    participant S as SQL Server
+    participant G as Gateway (fake)
+    participant D as Outbox dispatcher
+    participant R as RabbitMQ
+    C->>A: POST /v1/invoices/{id}/capture (Idempotency-Key)
+    A->>M: CapturePayment
+    M->>M: log, validate, BEGIN TRAN
+    M->>S: payment for this key? → replay (200)
+    M->>S: UPDATE invoice SET paid WHERE Version = @v (claim)
+    M->>G: charge (retry + timeout, idempotent by key)
+    M->>S: INSERT payment (unique key) + INSERT outbox
+    M->>S: COMMIT
+    A-->>C: 201 receipt
+    D->>S: claim unpublished rows (UPDLOCK, READPAST)
+    D->>R: publish, wait for confirm
+    D->>S: mark published
+    R-->>A: payment.captured → inbox + TenantPayments
+```
+
+`Payments.Application` holds the mediator, handlers and domain, and has no reference to SQL, HTTP or RabbitMQ. `tests/Architecture.Tests` enforces that, and also that `BuildingBlocks.Messaging` knows no service.
+
 ## Target (M4)
 
 ```mermaid
@@ -73,11 +109,11 @@ flowchart LR
     gw["Gateway (YARP)<br/>route-level strangler switch"]:::planned
     ingest[Ingest.Api]
     access["Access.Api<br/>plans → roles → permissions"]
-    payments["Payments.Api<br/>CQRS + mediator"]:::planned
+    payments["Payments.Api<br/>CQRS + mediator"]
     legacy["Legacy.Monolith<br/>the before"]:::planned
     sql[(SQL Server)]
     redis[(Redis)]
-    mq{{RabbitMQ<br/>ingest.completed, payment.captured, plan.changed}}:::planned
+    mq{{RabbitMQ<br/>payment.captured, plan.changed<br/>ingest.completed planned}}
     otel["OpenTelemetry → Aspire dashboard"]:::planned
 
     client -.-> gw
@@ -90,10 +126,12 @@ flowchart LR
     ingest --> sql
     access --> sql
     access --> redis
-    payments -.-> sql
+    payments --> sql
     ingest -.->|outbox| mq
-    payments -.->|outbox| mq
-    mq -.-> access
+    payments -->|outbox| mq
+    access -->|outbox| mq
+    mq --> access
+    mq --> payments
 
     classDef planned stroke-dasharray: 5 5
 ```
@@ -102,7 +140,7 @@ flowchart LR
 |---|---|
 | M1 ✅ | Ingest service, SQL Server, compose, CI |
 | M2 ✅ | Access service, JWT, Redis permission cache |
-| M3 | Payments service, mediator, outbox + RabbitMQ, read model |
+| M3 ✅ | Payments service, mediator, outbox + RabbitMQ, read model, plan.changed |
 | M4 | Legacy monolith, YARP gateway, OpenTelemetry |
 
 Decisions behind these choices are in [ArggonManager/docs/adr](../ArggonManager/docs/adr/).
