@@ -1,0 +1,53 @@
+name: load-test
+
+# On demand, and on PRs that change the load test itself. Shared runners are noisy:
+# use the numbers to spot regressions, not as a benchmark.
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: "Duration per scenario (seconds, e.g. 30s)"
+        default: "30s"
+  pull_request:
+    paths:
+      - "benchmarks/k6/**"
+      - ".github/workflows/load-test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 300
+
+      - name: Wait for the API
+        run: |
+          for _ in $(seq 1 60); do curl -fsS http://localhost:8080/health && exit 0; sleep 2; done
+          exit 1
+
+      - name: Run k6
+        run: >
+          docker run --rm --network host --user "$(id -u)"
+          -v "$PWD:/work" -w /work
+          grafana/k6:1.3.0 run --quiet
+          -e DURATION="${{ inputs.duration || '30s' }}"
+          benchmarks/k6/ingest.js
+
+      - name: Publish summary
+        if: always()
+        run: |
+          echo "Runner: $(nproc) vCPU, $(free -g | awk '/Mem:/ {print $2}') GB RAM, API + SQL Server in docker compose on the same runner" >> "$GITHUB_STEP_SUMMARY"
+          [ -f k6-summary.md ] && cat k6-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop
+        if: always()
+        run: docker compose down --volumes
