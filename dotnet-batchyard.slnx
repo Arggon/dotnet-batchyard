@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Ingest.Benchmarks/Ingest.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/BuildingBlocks/BuildingBlocks.csproj" />
     <Project Path="src/Ingest.Api/Ingest.Api.csproj" />
