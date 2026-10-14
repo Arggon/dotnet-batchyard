@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using BuildingBlocks.Auth;
@@ -125,5 +127,34 @@ public sealed class OutboxTests(OutboxFixture api) : IClassFixture<OutboxFixture
 
         using var http = api.ClientFor(tenant);
         (await http.GetFromJsonAsync<List<PaymentHistoryItem>>("/v1/payments"))!.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task One_trace_runs_from_the_http_request_through_RabbitMQ_to_the_consumer()
+    {
+        var spans = new ConcurrentBag<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == MessagingTelemetry.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = spans.Add,
+        };
+        ActivitySource.AddActivityListener(listener);
+        var traceId = ActivityTraceId.CreateRandom();
+
+        using var http = api.ClientFor(Guid.NewGuid());
+        var invoice = await (await http.PostAsJsonAsync("/v1/invoices", new { amount = 5m, currency = "USD", reference = "T" }))
+            .Content.ReadFromJsonAsync<InvoiceView>();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/invoices/{invoice!.Id}/capture");
+        request.Headers.Add("Idempotency-Key", "trace-1");
+        request.Headers.Add("traceparent", $"00-{traceId}-{ActivitySpanId.CreateRandom()}-01");
+        (await http.SendAsync(request)).EnsureSuccessStatusCode();
+
+        var mine = await Eventually(
+            () => Task.FromResult(spans.Where(a => a.TraceId == traceId).Select(a => a.DisplayName).ToList()),
+            names => names.Contains("payment.captured process"));
+
+        mine.ShouldContain("payment.captured publish");
+        mine.ShouldContain("payment.captured process");
     }
 }
