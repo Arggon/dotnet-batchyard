@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using BuildingBlocks.Auth;
 using Ingest.Api.Items;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -18,9 +19,11 @@ public sealed class ItemEndpointsTests : IDisposable
         {
             host.UseSetting("ConnectionStrings:Ingest", db.ConnectionString);
             host.UseSetting("Ingest:MaxBatchSize", "100");
+            host.UseSetting("Jwt:SigningKey", TestTokens.SigningKey);
         });
         _client = _factory.CreateClient();
-        _client.DefaultRequestHeaders.Add("X-Tenant-Id", Guid.NewGuid().ToString());
+        _client.DefaultRequestHeaders.Authorization = new("Bearer",
+            TestTokens.For(Guid.NewGuid(), ["items:read", "items:write", "ingest:batch"], maxBatch: null));
     }
 
     public void Dispose()
@@ -54,13 +57,36 @@ public sealed class ItemEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task Missing_tenant_header_returns_400()
+    public async Task Missing_token_returns_401()
     {
         using var anonymous = _factory.CreateClient();
 
         var response = await anonymous.PostAsJsonAsync("/v1/items", Item("X"));
 
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Tenants_cannot_see_each_others_items()
+    {
+        await _client.PostAsJsonAsync("/v1/items", Item("PRIVATE"));
+        using var other = _factory.CreateClient();
+        other.DefaultRequestHeaders.Authorization = new("Bearer", TestTokens.For(Guid.NewGuid(), ["items:read"], null));
+
+        (await other.GetAsync(new Uri("/v1/items/PRIVATE", UriKind.Relative))).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Token_batch_limit_is_lower_than_the_service_limit()
+    {
+        using var limited = _factory.CreateClient();
+        limited.DefaultRequestHeaders.Authorization = new("Bearer",
+            TestTokens.For(Guid.NewGuid(), ["ingest:batch"], maxBatch: 2));
+
+        var response = await limited.PostAsJsonAsync("/v1/items:batch", new { items = new[] { Item("A"), Item("B"), Item("C") } });
+
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("between 1 and 2");
     }
 
     [Fact]
