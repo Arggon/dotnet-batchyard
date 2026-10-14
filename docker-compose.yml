@@ -1,0 +1,149 @@
+# One command: docker compose up --build
+# Local only. Every password, key and secret below is a throwaway dev value, never a real secret.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Local_dev_only_1"
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  ingest-api:
+    build:
+      context: .
+      dockerfile: src/Ingest.Api/Dockerfile
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "ingest-api"
+      ConnectionStrings__Ingest: "Server=sqlserver,1433;Database=batchyard;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
+      Messaging__Uri: "amqp://guest:guest@rabbitmq:5672"
+      Ingest__MaxBatchSize: "5000"
+      Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
+    ports:
+      - "8080:8080"
+    restart: on-failure
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  access-api:
+    build:
+      context: .
+      dockerfile: src/Access.Api/Dockerfile
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "access-api"
+      ConnectionStrings__Access: "Server=sqlserver,1433;Database=batchyard_access;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
+      ConnectionStrings__Redis: "redis:6379"
+      Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
+      Access__WebhookSecret: "local-dev-only-webhook-secret"
+      Messaging__Uri: "amqp://guest:guest@rabbitmq:5672"
+      Access__Seed__TenantName: "Demo Parts Co"
+      Access__Seed__Plan: "Pro"
+      Access__Seed__AdminClientId: "demo-admin"
+      Access__Seed__AdminClientSecret: "local-dev-only-client-secret"
+    ports:
+      - "8081:8080"
+    restart: on-failure
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    ports:
+      - "15672:15672" # management UI, guest/guest (local only)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  payments-api:
+    build:
+      context: .
+      dockerfile: src/Payments.Api/Dockerfile
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "payments-api"
+      ConnectionStrings__Payments: "Server=sqlserver,1433;Database=batchyard_payments;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
+      Messaging__Uri: "amqp://guest:guest@rabbitmq:5672"
+      Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
+    ports:
+      - "8082:8080"
+    restart: on-failure
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  legacy-monolith:
+    # The "before" (ADR 0015): same items table as ingest-api, per-row queries.
+    build:
+      context: .
+      dockerfile: src/Legacy.Monolith/Dockerfile
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "legacy-monolith"
+      ConnectionStrings__Items: "Server=sqlserver,1433;Database=batchyard;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
+      Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
+    ports:
+      - "8083:8080"
+    restart: on-failure
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      ingest-api:
+        condition: service_started # ingest-api owns and migrates the schema
+
+  gateway:
+    # Single entry point (ADR 0014). Move a route back to the monolith with e.g.
+    # ReverseProxy__Routes__items-batch__ClusterId: legacy
+    build:
+      context: .
+      dockerfile: src/Gateway/Dockerfile
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "gateway"
+      ReverseProxy__Clusters__ingest__Destinations__d1__Address: "http://ingest-api:8080/"
+      ReverseProxy__Clusters__access__Destinations__d1__Address: "http://access-api:8080/"
+      ReverseProxy__Clusters__payments__Destinations__d1__Address: "http://payments-api:8080/"
+      ReverseProxy__Clusters__legacy__Destinations__d1__Address: "http://legacy-monolith:8080/"
+    ports:
+      - "8000:8080"
+    depends_on:
+      - ingest-api
+      - access-api
+      - payments-api
+      - legacy-monolith
+
+  aspire-dashboard:
+    # Traces, metrics and logs from every service (ADR 0016). UI: http://localhost:18888 (no login, local only).
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.0
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "18888:18888"

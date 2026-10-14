@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.MsSql" />
+    <PackageReference Include="Testcontainers.Redis" />
+    <PackageReference Include="Testcontainers.RabbitMq" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Access.Api\Access.Api.csproj" />
+  </ItemGroup>
+</Project>

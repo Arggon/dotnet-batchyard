@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="dbup-sqlserver" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The SQL lives in /db so it is reviewed like code; it ships embedded and DbUp applies it in order. -->
+    <EmbeddedResource Include="..\..\db\ingest\*.sql" LinkBase="Migrations" />
+  </ItemGroup>
+</Project>

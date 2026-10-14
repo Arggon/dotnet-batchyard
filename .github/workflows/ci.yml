@@ -1,0 +1,87 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    name: build, format, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (warnings are errors)
+        run: dotnet build --no-restore -c Release
+
+      - name: Format check
+        run: dotnet format --no-restore --verify-no-changes
+
+      # Integration tests start SQL Server with Testcontainers; the runner has Docker.
+      - name: Test
+        run: >
+          dotnet test --no-build -c Release
+          --collect:"XPlat Code Coverage"
+          --results-directory TestResults
+          --logger "trx"
+          --settings coverlet.runsettings
+
+      - name: Coverage report
+        if: always()
+        uses: danielpalme/ReportGenerator-GitHub-Action@v5
+        with:
+          reports: TestResults/**/coverage.cobertura.xml
+          targetdir: TestResults/coverage
+          reporttypes: HtmlInline;MarkdownSummaryGithub;TextSummary
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          cat TestResults/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          head -n 20 TestResults/coverage/Summary.txt
+
+      - name: Upload test results and coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+
+  compose-smoke:
+    name: docker compose smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 300
+
+      - name: Smoke test
+        run: ./scripts/smoke.sh
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop
+        if: always()
+        run: docker compose down --volumes

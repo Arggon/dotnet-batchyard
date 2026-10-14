@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BuildingBlocks\BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\src\Ingest.Api\Ingest.Api.csproj" />
+  </ItemGroup>
+</Project>
