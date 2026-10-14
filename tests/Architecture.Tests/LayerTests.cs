@@ -25,4 +25,15 @@ public class LayerTests
 
         result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    [Fact]
+    public void Payments_application_knows_nothing_about_sql_http_or_messaging()
+    {
+        var result = Types.InAssembly(typeof(Payments.Application.Mediator.Mediator).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny("Payments.Data", "Payments.Api", "Microsoft.Data.SqlClient", "Dapper", "Microsoft.AspNetCore", "RabbitMQ")
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }
