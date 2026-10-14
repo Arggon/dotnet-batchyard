@@ -23,6 +23,7 @@ public sealed class IngestAuthorizationMatrixTests : IDisposable
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:Ingest", db.ConnectionString);
+            host.UseSetting("Messaging:Enabled", "false");
             host.UseSetting("Ingest:MaxBatchSize", "5000");
             host.UseSetting("Jwt:SigningKey", TestTokens.SigningKey);
         });

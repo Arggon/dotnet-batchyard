@@ -18,6 +18,7 @@ public sealed class ItemEndpointsTests : IDisposable
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:Ingest", db.ConnectionString);
+            host.UseSetting("Messaging:Enabled", "false");
             host.UseSetting("Ingest:MaxBatchSize", "100");
             host.UseSetting("Jwt:SigningKey", TestTokens.SigningKey);
         });

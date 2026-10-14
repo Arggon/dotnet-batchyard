@@ -8,4 +8,7 @@
     <ProjectReference Include="..\..\src\Ingest.Data\Ingest.Data.csproj" />
     <ProjectReference Include="..\..\src\Access.Data\Access.Data.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BuildingBlocks.Messaging\BuildingBlocks.Messaging.csproj" />
+  </ItemGroup>
 </Project>
