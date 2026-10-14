@@ -87,6 +87,7 @@ sequenceDiagram
     C->>A: POST /v1/invoices/{id}/capture (Idempotency-Key)
     A->>M: CapturePayment
     M->>M: log, validate, BEGIN TRAN
+    M->>S: read invoice (404 if not this tenant's)
     M->>S: payment for this key? → replay (200)
     M->>S: UPDATE invoice SET paid WHERE Version = @v (claim)
     M->>G: charge (retry + timeout, idempotent by key)
