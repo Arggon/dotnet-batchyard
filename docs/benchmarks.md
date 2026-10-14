@@ -22,6 +22,33 @@ docker compose up --build -d
 dotnet run -c Release --project tools/Ingest.DemoClient -- --items 50000 --batch-size 5000
 ```
 
+## Under concurrent load (k6)
+
+`benchmarks/k6/ingest.js` runs two scenarios one after the other, 30 s each:
+
+- **single:** 20 virtual users posting one item per request
+- **batch:** 5 virtual users posting 500 items per request
+
+Every request inserts new rows. Thresholds fail the run if more than 1% of requests fail or p95 goes over 500 ms (single) or 3 s (batch). The scenarios use different user counts, so compare items/s, not latency.
+
+Measured 2026-10-14 in two places:
+
+| Where | Scenario | p50 | p95 | Items written | Items/s |
+|---|---|---:|---:|---:|---:|
+| Cloud VM (8 vCPU; API Release build on the host, SQL Server in Docker) | single | 3.4 ms | 6.2 ms | 147,256 | 4,909 |
+| | batch (500) | 18.8 ms | 30.4 ms | 3,152,000 | 105,067 |
+| GitHub Actions `ubuntu-latest` (4 vCPU; API + SQL Server in `docker compose`) | single | 5.8 ms | 37.5 ms | 46,067 | 1,536 |
+| | batch (500) | 36.0 ms | 223.6 ms | 993,500 | 33,117 |
+
+Both runs had 0% failed requests. On both machines, batching wrote about **21× more items per second**. Shared CI runners are noisy, so the CI numbers are for spotting regressions, not for quoting.
+
+Reproduce locally, or run the `load-test` workflow from the Actions tab:
+
+```bash
+docker compose up --build -d
+k6 run benchmarks/k6/ingest.js            # -e DURATION=60s -e BATCH_SIZE=1000 to tune
+```
+
 ## Data access: one-by-one vs batch (BenchmarkDotNet)
 
 `benchmarks/Ingest.Benchmarks` inserts N new items for a fresh tenant in two ways:
@@ -60,7 +87,7 @@ Raw BenchmarkDotNet output (mean of 8 iterations, 2 warmups, one invocation per 
 
 - The gap is mostly round trips: the one-by-one path pays connection, call and commit overhead per row. Here the database runs on the same machine, so every round trip is cheap. Over a real network the one-by-one path would be slower, so these ratios are on the conservative side for that.
 - Docker on a shared cloud VM is noisy (see the Error column). Treat the ratios as the result and the absolute times as rough.
-- The 80% on the CV comes from a different system, measured end to end at the client. This page measures only the data-access layer. The end-to-end k6 comparison comes in milestone 4.
+- The 80% on the CV comes from a different system, measured end to end at the client. This page measures only the data-access layer. The k6 comparison against the legacy monolith comes in milestone 4.
 
 ### Reproduce
 

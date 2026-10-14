@@ -9,7 +9,7 @@ I'm Gonzalo, a senior .NET backend engineer. [Portfolio and CV](https://arggon.g
 
 ## The headline number
 
-Inserting 5,000 items through the batch endpoint's data path takes **155 ms**. Doing it one item at a time takes **7.6 s**, so the batch path saves **98%** of the time. That number was measured in this repo with BenchmarkDotNet at the data layer. Over HTTP, the demo client imports **50,000 items in 1.3 s with batches vs 86 s one at a time (98% less)**. Both runs were on a single cloud VM, not production hardware. [Full results, environment and caveats](docs/benchmarks.md)
+Inserting 5,000 items through the batch endpoint's data path takes **155 ms**. Doing it one item at a time takes **7.6 s**, so the batch path saves **98%** of the time. That number was measured in this repo with BenchmarkDotNet at the data layer. Over HTTP, the demo client imports **50,000 items in 1.3 s with batches vs 86 s one at a time (98% less)**. Under concurrent load (k6), batching wrote about **21× more items per second**, both on a cloud VM and on a GitHub Actions runner. None of these runs used production hardware. [Full results, environment and caveats](docs/benchmarks.md)
 
 | Items | one-by-one | batch (TVP + MERGE) | Time saved |
 |------:|-----------:|--------------------:|-----------:|
@@ -82,7 +82,7 @@ Why it's built this way: [ADR 0001: TVP + MERGE](ArggonManager/docs/adr/0001-bat
 - **Unit tests** for the validation rules
 - **Integration tests against a real SQL Server 2022** started by Testcontainers, with no database mocks: the stored procedure, the TVP, duplicates, a 5,000-row batch, and the HTTP endpoints end to end
 - **Architecture tests** (NetArchTest): the data layer can't depend on the API
-- **CI on every PR:** build with warnings as errors, `dotnet format` check, all tests, a `docker compose` smoke test, CodeQL and `arggon validate`
+- **CI on every PR:** build with warnings as errors, `dotnet format` check, all tests, a `docker compose` smoke test, merged code coverage on the job page, CodeQL and `arggon validate`. A k6 load test runs on demand
 
 ```bash
 dotnet test   # needs Docker for the integration tests
@@ -90,7 +90,7 @@ dotnet test   # needs Docker for the integration tests
 
 ## Stack
 
-.NET 10 · ASP.NET Core Minimal APIs · SQL Server 2022 · Dapper · DbUp · xUnit + Shouldly · Testcontainers · BenchmarkDotNet · Docker Compose · GitHub Actions
+.NET 10 · ASP.NET Core Minimal APIs · SQL Server 2022 · Dapper · DbUp · xUnit + Shouldly · Testcontainers · BenchmarkDotNet · k6 · Docker Compose · GitHub Actions
 
 ## How it was built
 
@@ -109,7 +109,7 @@ src/Ingest.Data         Dapper repository + DbUp migrator
 src/BuildingBlocks      Small shared helpers (no framework)
 db/ingest               Versioned SQL: tables, TVP type, stored procedures
 tests/                  Unit, integration (Testcontainers) and architecture tests
-benchmarks/             BenchmarkDotNet
+benchmarks/             BenchmarkDotNet + k6
 tools/Ingest.DemoClient 50,000-item import, one-by-one vs batch
 ArggonManager/          Specs, plans, tasks, ADRs, playbooks
 docs/                   Architecture, benchmarks, agentic workflow
@@ -117,7 +117,7 @@ docs/                   Architecture, benchmarks, agentic workflow
 
 ## Roadmap
 
-- **M1, done:** skeleton, CI, compose, ingest batch endpoint, integration tests, first benchmark
+- **M1, done:** skeleton, CI with coverage, compose, ingest batch endpoint, integration tests, BenchmarkDotNet + demo client + k6 numbers, architecture diagrams
 - **M2:** access service with plans, roles and permissions, JWT, authorization matrix, Redis cache
 - **M3:** payments service with CQRS, a hand-rolled mediator, idempotency, outbox + RabbitMQ
 - **M4:** legacy monolith + YARP strangler + k6, OpenTelemetry
