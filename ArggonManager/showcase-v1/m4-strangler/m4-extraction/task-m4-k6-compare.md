@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 id: task-m4-k6-compare
 title: "k6: monolith vs service"
 parent: m4-extraction

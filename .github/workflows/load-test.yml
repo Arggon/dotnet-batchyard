@@ -27,7 +27,7 @@ jobs:
 
       - name: Wait for the APIs
         run: |
-          for url in http://localhost:8081 http://localhost:8080; do
+          for url in http://localhost:8081 http://localhost:8080 http://localhost:8083 http://localhost:8000; do
             for _ in $(seq 1 60); do curl -fsS "$url/health" && break; sleep 2; done
           done
 
@@ -39,11 +39,20 @@ jobs:
           -e DURATION="${{ inputs.duration || '30s' }}"
           benchmarks/k6/ingest.js
 
+      - name: Run k6 (monolith vs service)
+        run: >
+          docker run --rm --network host --user "$(id -u)"
+          -v "$PWD:/work" -w /work
+          grafana/k6:1.3.0 run --quiet
+          -e DURATION="${{ inputs.duration || '30s' }}"
+          benchmarks/k6/strangler.js
+
       - name: Publish summary
         if: always()
         run: |
           echo "Runner: $(nproc) vCPU, $(free -g | awk '/Mem:/ {print $2}') GB RAM, API + SQL Server in docker compose on the same runner" >> "$GITHUB_STEP_SUMMARY"
           [ -f k6-summary.md ] && cat k6-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+          [ -f k6-strangler-summary.md ] && cat k6-strangler-summary.md >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Logs on failure
         if: failure()

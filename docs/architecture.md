@@ -107,23 +107,22 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     client([Clients])
-    gw["Gateway (YARP)<br/>route-level strangler switch"]:::planned
+    gw["Gateway (YARP)<br/>route-level strangler switch"]
     ingest[Ingest.Api]
     access["Access.Api<br/>plans → roles → permissions"]
     payments["Payments.Api<br/>CQRS + mediator"]
-    legacy["Legacy.Monolith<br/>the before"]:::planned
+    legacy["Legacy.Monolith<br/>the before"]
     sql[(SQL Server)]
     redis[(Redis)]
     mq{{RabbitMQ<br/>payment.captured, plan.changed<br/>ingest.completed planned}}
     otel["OpenTelemetry → Aspire dashboard"]:::planned
 
-    client -.-> gw
-    client --> access
-    client --> ingest
+    client --> gw
     gw --> ingest
-    gw -.-> access
-    gw -.-> payments
-    gw -.-> legacy
+    gw --> access
+    gw --> payments
+    gw --> legacy
+    legacy --> sql
     ingest --> sql
     access --> sql
     access --> redis
@@ -142,6 +141,6 @@ flowchart LR
 | M1 ✅ | Ingest service, SQL Server, compose, CI |
 | M2 ✅ | Access service, JWT, Redis permission cache |
 | M3 ✅ | Payments service, mediator, outbox + RabbitMQ, read model, plan.changed |
-| M4 | Legacy monolith, YARP gateway, OpenTelemetry |
+| M4 | Legacy monolith ✅, YARP gateway ✅, k6 comparison ✅, OpenTelemetry |
 
 Decisions behind these choices are in [ArggonManager/docs/adr](../ArggonManager/docs/adr/).

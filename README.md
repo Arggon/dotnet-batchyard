@@ -25,7 +25,7 @@ Inserting 5,000 items through the batch endpoint's data path takes **155 ms**. D
 | Spec-first, test-gated delivery with AI agents | Every change starts as a spec and a task under [`ArggonManager/`](ArggonManager/), with tests written first and one small PR per task | ✅ M1 |
 | Access roles and permissions that enabled marketplace monetization | Access service: plans grant roles, roles carry permissions and limits. A marketplace subscription webhook grants a restricted `marketplace-seller` role. JWT login, Redis permission cache, authorization matrix tests | ✅ M2 |
 | CQRS + mediator in a payments service | Payments service: commands and queries through a hand-written mediator, idempotent capture backed by a unique index, transactional outbox to RabbitMQ, an eventually consistent read model. Access clears its Redis cache when it consumes `plan.changed` | ✅ M3 |
-| A .NET microservice extracted from a monolith | YARP gateway moving routes from a legacy app, compared with k6 | 🔜 M4 |
+| A .NET microservice extracted from a monolith | A legacy monolith with per-row SQL, a YARP gateway that moves routes one config key at a time, and a k6 comparison: at 500 items per request, ingest-svc's p50 was **93% lower** than the monolith's | ✅ M4 |
 
 At work these patterns ran on .NET 9. Here they're rebuilt from scratch on .NET 10 with an invented domain, so there's no client code or data.
 
@@ -37,7 +37,7 @@ You only need Docker:
 docker compose up --build
 ```
 
-This starts SQL Server, Redis, RabbitMQ (management UI on port 15672, guest/guest), the access service (port 8081), the ingest service (port 8080) and the payments service (port 8082). It also seeds a demo tenant on the Pro plan, with an API client whose credentials are local-only values from `docker-compose.yml`.
+This starts SQL Server, Redis, RabbitMQ (management UI on port 15672, guest/guest), the access service (port 8081), the ingest service (port 8080), the payments service (port 8082), the legacy monolith (port 8083) and the YARP gateway (port 8000) in front of all of them. Every example below also works through the gateway: swap the port for 8000. It also seeds a demo tenant on the Pro plan, with an API client whose credentials are local-only values from `docker-compose.yml`.
 
 Get a token, then send a batch with one valid and one invalid row:
 
@@ -91,6 +91,30 @@ flowchart LR
 - **Safe retries.** Send an `Idempotency-Key` header and a retried request gets the original response back. Reusing the key with a different body returns 409.
 - **The SQL is code.** Tables, the TVP type and the procedures live in [`db/ingest/`](db/ingest/) and are applied in order by DbUp.
 
+## How the extraction works
+
+```mermaid
+flowchart LR
+    C[Client] --> G[YARP gateway :8000]
+    G -->|items-batch, items<br/>ClusterId: ingest| I[ingest-svc<br/>TVP + MERGE]
+    G -.->|flip ClusterId: legacy| L[legacy monolith<br/>SELECT + INSERT per row]
+    G -->|reports: not migrated yet| L
+    I --> DB[(dbo.Items, shared<br/>during the migration)]
+    L --> DB
+```
+
+- **Strangler, not big bang** ([ADR 0015](ArggonManager/docs/adr/0015-extracting-ingest-from-the-monolith.md)). The monolith and ingest-svc keep the same `/v1/items` contract and write the same table, so a route can move either way at any time.
+- **One config key per route** ([ADR 0014](ArggonManager/docs/adr/0014-yarp-gateway-route-switching.md)). `ReverseProxy__Routes__items-batch__ClusterId=legacy` sends batches back to the monolith; nothing else moves. Every response carries `X-Backend` so you can see who answered.
+- **Measured with k6** on a cloud VM, 5 VUs, 30 s per target:
+
+| 500 items per request | p50 | p95 | Items/s |
+|---|---:|---:|---:|
+| legacy monolith | 293–317 ms | 376–454 ms | 7,450–7,933 |
+| ingest-svc | 20–21 ms | 31–37 ms | 92,517–99,717 |
+| ingest-svc through the gateway | 21–22 ms | 31–32 ms | 91,850–98,233 |
+
+  Ranges cover two runs. At 50 items per request the p50 gap is 80%. The gateway hop cost under 1 ms at p50. The win comes from the set-based data path that the extraction made safe to ship. [Details and caveats](docs/benchmarks.md#monolith-vs-extracted-service-k6-m4)
+
 ## How access works
 
 | Plan | Roles it grants | What that allows |
@@ -142,8 +166,9 @@ Why it's built this way: [ADR 0001: TVP + MERGE](ArggonManager/docs/adr/0001-bat
 - **Integration tests against real SQL Server 2022, Redis and RabbitMQ** started by Testcontainers, with no database mocks: the stored procedure, the TVP, duplicates, a 5,000-row batch, plan changes, the permission cache, and the HTTP endpoints end to end
 - **Authorization matrices** as data-driven xUnit theories: role × endpoint → expected status, for both services. The ingest matrix reads each role from the real access catalog
 - **Payments tests:** unit tests for the mediator pipeline and handlers, plus integration tests against SQL Server and RabbitMQ: double capture, concurrent captures with the same key and with different keys, gateway retries and outages, refund, the outbox reaching the read model, inbox dedup
+- **Legacy and gateway tests:** the monolith's per-row contract against SQL Server, and gateway routing and per-route switching against fake backends
 - **Architecture tests** (NetArchTest): data layers can't depend on APIs, the payments application layer knows nothing about SQL, HTTP or RabbitMQ, and the messaging library knows no service
-- **CI on every PR:** build with warnings as errors, `dotnet format` check, all tests, a `docker compose` smoke test (batch import, idempotent capture, read model updated through RabbitMQ), merged code coverage on the job page, CodeQL and `arggon validate`. A k6 load test runs on demand
+- **CI on every PR:** build with warnings as errors, `dotnet format` check, all tests, a `docker compose` smoke test (batch import, legacy write read back through ingest, idempotent capture, read model updated through RabbitMQ, gateway routing), merged code coverage on the job page, CodeQL and `arggon validate`. A k6 load test runs on demand
 
 ```bash
 dotnet test   # needs Docker for the integration tests
@@ -151,7 +176,7 @@ dotnet test   # needs Docker for the integration tests
 
 ## Stack
 
-.NET 10 · ASP.NET Core Minimal APIs · SQL Server 2022 · Dapper · EF Core · DbUp · JWT · Redis · RabbitMQ · Polly · xUnit + Shouldly · Testcontainers · BenchmarkDotNet · k6 · Docker Compose · GitHub Actions
+.NET 10 · ASP.NET Core Minimal APIs · SQL Server 2022 · Dapper · EF Core · DbUp · JWT · Redis · RabbitMQ · Polly · YARP · xUnit + Shouldly · Testcontainers · BenchmarkDotNet · k6 · Docker Compose · GitHub Actions
 
 ## How it was built
 
@@ -172,6 +197,8 @@ src/Access.Data         EF Core model, plan changes, Redis permission cache
 src/Payments.Api        Invoice, capture, refund and history endpoints
 src/Payments.Application  Mediator, pipeline behaviors, commands, queries, domain (no SQL, no HTTP)
 src/Payments.Data       Dapper repositories, outbox writer, read-model consumer, fake gateway
+src/Gateway             YARP routes and clusters in config, X-Backend header
+src/Legacy.Monolith     The "before": plain ADO.NET, per-row SQL, a legacy-only stock report
 src/BuildingBlocks      Shared JWT validation and the permission filter (no framework)
 src/BuildingBlocks.Messaging  Outbox dispatcher, RabbitMQ publisher (confirms) and consumer
 db/ingest, db/access, db/payments  Versioned SQL: tables, TVP type, procedures, catalog, outbox
@@ -187,7 +214,7 @@ docs/                   Architecture, benchmarks, agentic workflow
 - **M1, done:** skeleton, CI with coverage, compose, ingest batch endpoint, integration tests, BenchmarkDotNet + demo client + k6 numbers, architecture diagrams
 - **M2, done:** access service with plans, roles and permissions, JWT login, authorization matrices, Redis cache. Ingest now takes the tenant from the token
 - **M3, done:** payments service with commands and queries, a hand-written mediator, idempotent capture, outbox + RabbitMQ, a read model. Access clears its cache on `plan.changed`
-- **M4:** legacy monolith + YARP strangler + k6, OpenTelemetry
+- **M4, in progress:** legacy monolith, YARP strangler gateway and the k6 comparison are in; OpenTelemetry next
 
 ## License
 

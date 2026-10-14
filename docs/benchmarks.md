@@ -2,6 +2,40 @@
 
 All numbers on this page were measured in this repo. None are copied from the CV.
 
+## Monolith vs extracted service (k6, M4)
+
+The same load against the legacy monolith (one `SELECT` plus one `INSERT` per row) and against ingest-svc (one TVP, one `MERGE`), then against ingest-svc through the YARP gateway. Script: [`benchmarks/k6/strangler.js`](../benchmarks/k6/strangler.js). 5 VUs, 30 s per target, JWT auth on, every row a new insert.
+
+Measured 2026-10-14 on the cloud VM described under Environment. All four apps (access, ingest, legacy, gateway) ran as Release builds on the host; SQL Server 2022 ran in Docker on the same VM. Both backends write the same `dbo.Items` table.
+
+**500 items per request** (two runs, both shown):
+
+| Target | p50 | p95 | Items/s |
+|---|---:|---:|---:|
+| legacy monolith, run 1 | 316.8 ms | 453.7 ms | 7,450 |
+| ingest-svc, run 1 | 21.0 ms | 36.9 ms | 92,517 |
+| ingest-svc via gateway, run 1 | 21.9 ms | 31.5 ms | 91,850 |
+| legacy monolith, run 2 | 293.2 ms | 376.4 ms | 7,933 |
+| ingest-svc, run 2 | 20.0 ms | 30.5 ms | 99,717 |
+| ingest-svc via gateway, run 2 | 20.9 ms | 30.7 ms | 98,233 |
+
+**50 items per request** (one run):
+
+| Target | p50 | p95 | Items/s |
+|---|---:|---:|---:|
+| legacy monolith | 31.8 ms | 45.4 ms | 7,027 |
+| ingest-svc | 6.5 ms | 10.6 ms | 32,198 |
+| ingest-svc via gateway | 6.7 ms | 12.6 ms | 29,478 |
+
+What this says, and what it doesn't:
+
+- At 500 items per request the service's p50 is **93% lower** than the monolith's in both runs. At 50 items it is **80% lower**. The gap grows with batch size because the monolith pays two round trips per row.
+- The gateway added **0.2–0.9 ms at p50** in these runs.
+- The speedup comes from the data path (set-based SQL instead of a per-row loop), not from "microservices" as such. Extracting the service is what made it safe to rewrite that path behind the same contract.
+- One VM, short runs, the database on the same machine as the apps. Treat the ratios as indicative, not as production numbers.
+
+Reproduce: start the stack (`docker compose up --build`), then `k6 run benchmarks/k6/strangler.js` (defaults: legacy :8083, service :8080, gateway :8000). The `load-test` workflow also runs it on a GitHub runner.
+
 ## Re-measured with JWT auth (M2)
 
 Since M2, every request carries a bearer token that Ingest validates. Both tools were re-run on the same VM on 2026-10-14 (API Release builds on the host; SQL Server and Redis in Docker):
