@@ -1,0 +1,31 @@
+# One command: docker compose up --build
+# Local only. The SA password below is for a throwaway dev container, never a real secret.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Local_dev_only_1"
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  ingest-api:
+    build:
+      context: .
+      dockerfile: src/Ingest.Api/Dockerfile
+    environment:
+      ConnectionStrings__Ingest: "Server=sqlserver,1433;Database=batchyard;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
+      Ingest__MaxBatchSize: "5000"
+    ports:
+      - "8080:8080"
+    restart: on-failure
+    depends_on:
+      sqlserver:
+        condition: service_healthy

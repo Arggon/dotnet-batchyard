@@ -50,3 +50,23 @@ jobs:
         with:
           name: test-results
           path: TestResults
+
+  compose-smoke:
+    name: docker compose smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 300
+
+      - name: Smoke test
+        run: ./scripts/smoke.sh
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop
+        if: always()
+        run: docker compose down --volumes
