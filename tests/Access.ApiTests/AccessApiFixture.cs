@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
+using Testcontainers.Redis;
 
 namespace Access.ApiTests;
 
@@ -17,12 +18,16 @@ public sealed class AccessApiFixture : IAsyncLifetime
 
     private readonly MsSqlContainer _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
 
+    private readonly RedisContainer _redis = new RedisBuilder("redis:7.4-alpine").Build();
+
     public string ConnectionString { get; private set; } = "";
+    public string RedisConnectionString { get; private set; } = "";
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
+        await Task.WhenAll(_container.StartAsync(), _redis.StartAsync());
+        RedisConnectionString = _redis.GetConnectionString();
         ConnectionString = new SqlConnectionStringBuilder(_container.GetConnectionString()) { InitialCatalog = "batchyard_access" }.ConnectionString;
         Factory = CreateFactory(tokenRequestsPerMinute: 1000);
     }
@@ -31,6 +36,7 @@ public sealed class AccessApiFixture : IAsyncLifetime
         new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
             host.UseSetting("ConnectionStrings:Access", ConnectionString);
+            host.UseSetting("ConnectionStrings:Redis", RedisConnectionString);
             host.UseSetting("Jwt:SigningKey", SigningKey);
             host.UseSetting("Access:WebhookSecret", WebhookSecret);
             host.UseSetting("Access:TokenRequestsPerMinute", tokenRequestsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -58,6 +64,7 @@ public sealed class AccessApiFixture : IAsyncLifetime
     {
         await Factory.DisposeAsync();
         await _container.DisposeAsync();
+        await _redis.DisposeAsync();
     }
 }
 
