@@ -1,4 +1,5 @@
 using BuildingBlocks.Auth;
+using BuildingBlocks.Messaging;
 using Payments.Api;
 using Payments.Application;
 using Payments.Data;
@@ -11,6 +12,12 @@ var connectionString = builder.Configuration.GetConnectionString("Payments")
 builder.Services.AddPaymentsApplication();
 builder.Services.AddPaymentsData(connectionString,
     builder.Configuration.GetSection("Gateway").Get<Payments.Data.Gateway.GatewayResilienceOptions>());
+if (builder.Configuration.GetValue("Messaging:Enabled", true))
+{
+    builder.Services.AddPaymentsMessaging(connectionString,
+        builder.Configuration.GetSection("Messaging").Get<MessagingOptions>() ?? new MessagingOptions());
+}
+
 builder.Services.AddBatchyardJwt(builder.Configuration);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddProblemDetails();

@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 id: task-m3-outbox
 title: "Outbox, RabbitMQ and payments read model"
 parent: m3-events

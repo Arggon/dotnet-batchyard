@@ -20,6 +20,8 @@ public static class PaymentEndpoints
 
         app.MapPost("/v1/payments/{id:guid}/refund", Refund).RequirePermission("payments:write").WithTags("Payments")
             .WithSummary("Refund a captured payment in full. Idempotency-Key header required.");
+        app.MapGet("/v1/payments", ListPayments).RequirePermission("payments:read").WithTags("Payments")
+            .WithSummary("Tenant payment history from the read model (eventually consistent, newest first).");
 
         return app;
     }
@@ -36,6 +38,9 @@ public static class PaymentEndpoints
         var view = await mediator.Send(new GetInvoice(http.User.TenantId(), id), http.RequestAborted);
         return view is null ? Results.NotFound() : Results.Ok(view);
     }
+
+    private static async Task<IResult> ListPayments(HttpContext http, IMediator mediator, int? take) =>
+        Results.Ok(await mediator.Send(new ListTenantPayments(http.User.TenantId(), take ?? 50), http.RequestAborted));
 
     private static Task<IResult> Capture(Guid id, HttpContext http, IMediator mediator) =>
         SendIdempotent(http, mediator, key => new CapturePayment(http.User.TenantId(), id, key));

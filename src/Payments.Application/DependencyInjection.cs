@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddScoped<IRequestHandler<CapturePayment, PaymentReceipt>, CapturePaymentHandler>();
         services.AddScoped<IRequestHandler<RefundPayment, PaymentReceipt>, RefundPaymentHandler>();
         services.AddScoped<IRequestHandler<GetInvoice, InvoiceView?>, GetInvoiceHandler>();
+        services.AddScoped<IRequestHandler<ListTenantPayments, IReadOnlyList<PaymentHistoryItem>>, ListTenantPaymentsHandler>();
 
         services.AddSingleton<IValidator<CreateInvoice>, CreateInvoiceValidator>();
         services.AddSingleton<IValidator<CapturePayment>, IdempotencyKeyValidator>();

@@ -60,3 +60,30 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    ports:
+      - "15672:15672" # management UI, guest/guest (local only)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  payments-api:
+    build:
+      context: .
+      dockerfile: src/Payments.Api/Dockerfile
+    environment:
+      ConnectionStrings__Payments: "Server=sqlserver,1433;Database=batchyard_payments;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
+      Messaging__Uri: "amqp://guest:guest@rabbitmq:5672"
+      Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
+    ports:
+      - "8082:8080"
+    restart: on-failure
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy

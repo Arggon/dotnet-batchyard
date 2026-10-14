@@ -7,6 +7,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Payments.Application\Payments.Application.csproj" />
+    <ProjectReference Include="..\BuildingBlocks.Messaging\BuildingBlocks.Messaging.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\..\db\payments\*.sql" LinkBase="Migrations" />
