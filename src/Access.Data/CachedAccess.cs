@@ -6,7 +6,7 @@ namespace Access.Data;
 
 /// <summary>
 /// Cache-aside over <see cref="AccessService"/> permission lookups (ADR 0008).
-/// Keys include a per-tenant generation; a plan change bumps the generation, so every cached entry
+/// Keys include a per-tenant generation; the plan.changed event bumps the generation, so every cached entry
 /// for that tenant is skipped at once and expires on its own TTL.
 /// If the cache is unavailable, lookups go straight to SQL.
 /// </summary>
@@ -42,18 +42,10 @@ public sealed partial class CachedAccess(AccessService access, IDistributedCache
         return fresh;
     }
 
-    /// <summary>Changes the plan, then invalidates the tenant's cached permissions.</summary>
-    public async Task<bool> ChangePlanAsync(Guid tenantId, string planCode, CancellationToken ct = default)
-    {
-        if (!await access.ChangePlanAsync(tenantId, planCode, ct))
-        {
-            return false;
-        }
-
-        await InvalidateTenantAsync(tenantId, ct);
-        return true;
-    }
-
+    /// <summary>
+    /// Bumps the tenant's generation so all its cached entries are skipped. Called only by the
+    /// plan.changed consumer (ADR 0013); if Redis is down the failure is logged and entries expire on their TTL.
+    /// </summary>
     public Task InvalidateTenantAsync(Guid tenantId, CancellationToken ct = default) =>
         TryAsync(() => cache.SetStringAsync(GenerationKey(tenantId), Guid.NewGuid().ToString("N"),
             new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = Ttl * 2 }, ct));

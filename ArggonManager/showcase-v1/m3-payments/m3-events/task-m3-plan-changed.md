@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 id: task-m3-plan-changed
 title: plan.changed drives the permission cache
 parent: m3-events

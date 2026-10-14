@@ -11,6 +11,7 @@ public sealed class AccessDbContext(DbContextOptions<AccessDbContext> options) :
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<ApiClient> ApiClients => Set<ApiClient>();
     public DbSet<Assignment> Assignments => Set<Assignment>();
+    public DbSet<OutboxRow> Outbox => Set<OutboxRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,6 +51,13 @@ public sealed class AccessDbContext(DbContextOptions<AccessDbContext> options) :
         {
             e.ToTable("Assignments");
             e.HasKey(a => new { a.ClientId, a.RoleId });
+        });
+        modelBuilder.Entity<OutboxRow>(e =>
+        {
+            e.ToTable("Outbox");
+            e.Property(o => o.Id).ValueGeneratedNever();
+            e.Property(o => o.OccurredAt).HasColumnType("datetime2(3)");
+            e.Property(o => o.PublishedAt).HasColumnType("datetime2(3)");
         });
     }
 }

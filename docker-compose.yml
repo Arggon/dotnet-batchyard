@@ -48,6 +48,7 @@ services:
       ConnectionStrings__Redis: "redis:6379"
       Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
       Access__WebhookSecret: "local-dev-only-webhook-secret"
+      Messaging__Uri: "amqp://guest:guest@rabbitmq:5672"
       Access__Seed__TenantName: "Demo Parts Co"
       Access__Seed__Plan: "Pro"
       Access__Seed__AdminClientId: "demo-admin"
@@ -59,6 +60,8 @@ services:
       sqlserver:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
   rabbitmq:

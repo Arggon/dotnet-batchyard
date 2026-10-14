@@ -64,7 +64,7 @@ public static class AccessEndpoints
             : Results.Ok(new TenantView(me.TenantId, me.Plan, me.Roles, me.Permissions, me.MaxBatchSize));
     }
 
-    private static async Task<IResult> ChangePlan(PlanChangeRequest request, HttpContext http, CachedAccess access)
+    private static async Task<IResult> ChangePlan(PlanChangeRequest request, HttpContext http, AccessService access)
     {
         if (string.IsNullOrWhiteSpace(request.Plan) || !await access.ChangePlanAsync(http.User.TenantId(), request.Plan, http.RequestAborted))
         {
@@ -72,11 +72,11 @@ public static class AccessEndpoints
                 detail: "Use one of: Free, Pro, Marketplace.");
         }
 
-        return Results.Ok(new { plan = request.Plan, note = "Tokens issued from now on carry the new plan." });
+        return Results.Ok(new { plan = request.Plan, note = "Tokens issued from now on carry the new plan; cached permissions refresh when plan.changed is consumed." });
     }
 
     private static async Task<IResult> MarketplaceWebhook(
-        MarketplaceEvent body, HttpContext http, CachedAccess access, IOptions<AccessOptions> options)
+        MarketplaceEvent body, HttpContext http, AccessService access, IOptions<AccessOptions> options)
     {
         var expected = options.Value.WebhookSecret;
         var given = http.Request.Headers["X-Webhook-Secret"].ToString();

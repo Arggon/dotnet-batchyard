@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
 namespace Access.Data;
@@ -95,17 +96,21 @@ public sealed class AccessService(AccessDbContext db, TimeProvider clock)
     /// <summary>
     /// Moves the tenant to another plan: every client loses the roles the old plan granted and gets the new plan's roles.
     /// Roles assigned by hand (tenant-admin) are kept. Returns false for an unknown tenant or plan.
+    /// A plan.changed event is written to the outbox in the same SaveChanges (one transaction); the
+    /// permission cache is cleared by its consumer, not here (ADR 0013).
     /// </summary>
     public async Task<bool> ChangePlanAsync(Guid tenantId, string planCode, CancellationToken ct = default)
     {
         var plan = await db.Plans.Include(p => p.Roles).SingleOrDefaultAsync(p => p.Code == planCode, ct);
-        var tenant = await db.Tenants.SingleOrDefaultAsync(t => t.Id == tenantId, ct);
+        var tenant = await db.Tenants.Include(t => t.Plan).SingleOrDefaultAsync(t => t.Id == tenantId, ct);
         if (plan is null || tenant is null)
         {
             return false;
         }
 
+        var oldPlan = tenant.Plan.Code;
         tenant.PlanId = plan.Id;
+        tenant.Plan = plan;
         var clients = await db.ApiClients.Include(c => c.Assignments).Where(c => c.TenantId == tenantId).ToListAsync(ct);
         foreach (var client in clients)
         {
@@ -115,6 +120,15 @@ public sealed class AccessService(AccessDbContext db, TimeProvider clock)
                 .Where(r => !manual.Contains(r.Id))
                 .Select(r => new Assignment { ClientId = client.Id, RoleId = r.Id, Source = Assignment.FromPlan }));
         }
+
+        var now = clock.GetUtcNow().UtcDateTime;
+        db.Outbox.Add(new OutboxRow
+        {
+            Id = Guid.NewGuid(),
+            Type = PlanChangedEvent.Type,
+            Payload = JsonSerializer.Serialize(new PlanChangedEvent(tenantId, oldPlan, plan.Code, now), JsonSerializerOptions.Web),
+            OccurredAt = now,
+        });
 
         await db.SaveChangesAsync(ct);
         return true;

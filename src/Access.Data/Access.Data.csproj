@@ -6,6 +6,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\BuildingBlocks.Messaging\BuildingBlocks.Messaging.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="..\..\db\access\*.sql" LinkBase="Migrations" />
   </ItemGroup>
 </Project>

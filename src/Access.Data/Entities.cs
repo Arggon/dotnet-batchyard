@@ -52,3 +52,14 @@ public sealed class Assignment
     public Role Role { get; set; } = null!;
     public string Source { get; set; } = FromPlan;
 }
+
+/// <summary>A row of dbo.Outbox; drained to RabbitMQ by the shared outbox dispatcher.</summary>
+public sealed class OutboxRow
+{
+    public Guid Id { get; set; }
+    public string Type { get; set; } = "";
+    public string Payload { get; set; } = "";
+    public DateTime OccurredAt { get; set; }
+    public DateTime? PublishedAt { get; set; }
+    public int Attempts { get; set; }
+}
