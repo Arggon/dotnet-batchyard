@@ -12,4 +12,7 @@
     <Project Path="tests/Ingest.IntegrationTests/Ingest.IntegrationTests.csproj" />
     <Project Path="tests/Ingest.UnitTests/Ingest.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Ingest.DemoClient/Ingest.DemoClient.csproj" />
+  </Folder>
 </Solution>

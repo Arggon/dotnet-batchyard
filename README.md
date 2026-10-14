@@ -9,7 +9,7 @@ I'm Gonzalo, a senior .NET backend engineer. [Portfolio and CV](https://arggon.g
 
 ## The headline number
 
-Inserting 5,000 items through the batch endpoint's data path takes **155 ms**. Doing it one item at a time takes **7.6 s**, so the batch path saves **98%** of the time. That number was measured in this repo with BenchmarkDotNet. [Full results and caveats](docs/benchmarks.md)
+Inserting 5,000 items through the batch endpoint's data path takes **155 ms**. Doing it one item at a time takes **7.6 s**, so the batch path saves **98%** of the time. That number was measured in this repo with BenchmarkDotNet at the data layer. Over HTTP, the demo client imports **50,000 items in 1.3 s with batches vs 86 s one at a time (98% less)**. Both runs were on a single cloud VM, not production hardware. [Full results, environment and caveats](docs/benchmarks.md)
 
 | Items | one-by-one | batch (TVP + MERGE) | Time saved |
 |------:|-----------:|--------------------:|-----------:|
@@ -110,6 +110,7 @@ src/BuildingBlocks      Small shared helpers (no framework)
 db/ingest               Versioned SQL: tables, TVP type, stored procedures
 tests/                  Unit, integration (Testcontainers) and architecture tests
 benchmarks/             BenchmarkDotNet
+tools/Ingest.DemoClient 50,000-item import, one-by-one vs batch
 ArggonManager/          Specs, plans, tasks, ADRs, playbooks
 docs/                   Architecture, benchmarks, agentic workflow
 ```

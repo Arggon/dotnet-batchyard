@@ -2,6 +2,26 @@
 
 All numbers on this page were measured in this repo. None are copied from the CV.
 
+## End to end over HTTP: 50,000 items (demo client)
+
+`tools/Ingest.DemoClient` imports the same 50,000 items into a running API twice: first with one `POST /v1/items` per item, then with `POST /v1/items:batch` in chunks of 5,000. Each run uses a fresh tenant, so both runs insert 50,000 new rows. Requests are sent one after another (no parallelism), the way a simple client loop would.
+
+Measured 2026-10-14 on the VM described under Environment below. The API ran as a Release build on the host and SQL Server ran in Docker on the same VM:
+
+| Mode | Requests | Wall time | Items/s |
+|---|---:|---:|---:|
+| one-by-one | 50,000 | 86.3 s | 580 |
+| batch (5,000/request) | 10 | 1.3 s | 37,304 |
+
+**Batch saved 98.4% of the wall time.** Client, API and database were on one machine, so there was no real network latency. Over a real network each of the 50,000 single requests would pay a full round trip, which widens the gap.
+
+Reproduce:
+
+```bash
+docker compose up --build -d
+dotnet run -c Release --project tools/Ingest.DemoClient -- --items 50000 --batch-size 5000
+```
+
 ## Data access: one-by-one vs batch (BenchmarkDotNet)
 
 `benchmarks/Ingest.Benchmarks` inserts N new items for a fresh tenant in two ways:
