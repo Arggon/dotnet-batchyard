@@ -90,3 +90,20 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+
+  legacy-monolith:
+    # The "before" (ADR 0015): same items table as ingest-api, per-row queries.
+    build:
+      context: .
+      dockerfile: src/Legacy.Monolith/Dockerfile
+    environment:
+      ConnectionStrings__Items: "Server=sqlserver,1433;Database=batchyard;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
+      Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
+    ports:
+      - "8083:8080"
+    restart: on-failure
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      ingest-api:
+        condition: service_started # ingest-api owns and migrates the schema

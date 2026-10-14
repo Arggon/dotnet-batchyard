@@ -9,6 +9,7 @@
     <Project Path="src/BuildingBlocks/BuildingBlocks.csproj" />
     <Project Path="src/Ingest.Api/Ingest.Api.csproj" />
     <Project Path="src/Ingest.Data/Ingest.Data.csproj" />
+    <Project Path="src/Legacy.Monolith/Legacy.Monolith.csproj" />
     <Project Path="src/Payments.Api/Payments.Api.csproj" />
     <Project Path="src/Payments.Application/Payments.Application.csproj" />
     <Project Path="src/Payments.Data/Payments.Data.csproj" />
@@ -19,6 +20,7 @@
     <Project Path="tests/Architecture.Tests/Architecture.Tests.csproj" />
     <Project Path="tests/Ingest.IntegrationTests/Ingest.IntegrationTests.csproj" />
     <Project Path="tests/Ingest.UnitTests/Ingest.UnitTests.csproj" />
+    <Project Path="tests/Legacy.IntegrationTests/Legacy.IntegrationTests.csproj" />
     <Project Path="tests/Payments.IntegrationTests/Payments.IntegrationTests.csproj" />
     <Project Path="tests/Payments.UnitTests/Payments.UnitTests.csproj" />
   </Folder>

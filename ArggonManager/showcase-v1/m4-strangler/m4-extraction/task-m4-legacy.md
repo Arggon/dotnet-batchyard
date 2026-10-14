@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 id: task-m4-legacy
 title: "Legacy monolith"
 parent: m4-extraction
