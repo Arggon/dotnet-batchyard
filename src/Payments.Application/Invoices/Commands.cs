@@ -73,6 +73,12 @@ public sealed class CapturePaymentHandler(
         ArgumentNullException.ThrowIfNull(request);
         var key = request.IdempotencyKey!;
 
+        // Read the invoice BEFORE looking up the key. The invoice status and the payment row commit
+        // together, so if this read already sees "paid", the key lookup below sees that payment too.
+        // (Key first, invoice second lets a concurrent same-key request slip in between and get 409.)
+        var invoice = await invoices.GetAsync(request.TenantId, request.InvoiceId, cancellationToken)
+            ?? throw new NotFoundException($"Invoice {request.InvoiceId} not found.");
+
         // Same key again: return the original result, charge nothing.
         var existing = await payments.FindByIdempotencyKeyAsync(request.TenantId, key, cancellationToken);
         if (existing is not null)
@@ -82,8 +88,6 @@ public sealed class CapturePaymentHandler(
                 : throw new ConflictException("This Idempotency-Key was already used for a different operation.");
         }
 
-        var invoice = await invoices.GetAsync(request.TenantId, request.InvoiceId, cancellationToken)
-            ?? throw new NotFoundException($"Invoice {request.InvoiceId} not found.");
         invoice.MarkPaid();
 
         // Claim the invoice before charging: the version check (and the row lock it takes) means a
@@ -115,22 +119,24 @@ public sealed class RefundPaymentHandler(
         ArgumentNullException.ThrowIfNull(request);
         var key = request.IdempotencyKey!;
 
-        var existing = await payments.FindByIdempotencyKeyAsync(request.TenantId, key, cancellationToken);
-        if (existing is not null)
-        {
-            return existing.Kind == PaymentKind.Refund
-                ? PaymentReceipt.From(existing, replayed: true)
-                : throw new ConflictException("This Idempotency-Key was already used for a different operation.");
-        }
-
         var capture = await payments.GetAsync(request.TenantId, request.PaymentId, cancellationToken);
         if (capture is null || capture.Kind != PaymentKind.Capture)
         {
             throw new NotFoundException($"Captured payment {request.PaymentId} not found.");
         }
 
+        // Invoice first, key second: same reasoning as in CapturePaymentHandler.
         var invoice = await invoices.GetAsync(request.TenantId, capture.InvoiceId, cancellationToken)
             ?? throw new NotFoundException($"Invoice {capture.InvoiceId} not found.");
+
+        var existing = await payments.FindByIdempotencyKeyAsync(request.TenantId, key, cancellationToken);
+        if (existing is not null)
+        {
+            return existing.Kind == PaymentKind.Refund && existing.InvoiceId == invoice.Id
+                ? PaymentReceipt.From(existing, replayed: true)
+                : throw new ConflictException("This Idempotency-Key was already used for a different operation.");
+        }
+
         invoice.MarkRefunded();
         await invoices.UpdateStatusAsync(invoice, cancellationToken);
 
