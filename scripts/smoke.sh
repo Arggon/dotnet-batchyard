@@ -17,4 +17,12 @@ response=$(curl -fsS -X POST "$BASE_URL/v1/items:batch" \
       ]}')
 echo "$response"
 echo "$response" | grep -q '"created":1' && echo "$response" | grep -q '"rejected":1'
+ACCESS_URL="${ACCESS_URL:-http://localhost:8081}"
+for _ in $(seq 1 60); do
+  curl -fsS "$ACCESS_URL/health" >/dev/null 2>&1 && break
+  sleep 2
+done
+curl -fsS -X POST "$ACCESS_URL/v1/auth/token" -H "Content-Type: application/json" \
+  -d '{"clientId":"demo-admin","clientSecret":"local-dev-only-client-secret"}' | grep -q '"accessToken"'
+echo "access token issued"
 echo "smoke test passed"

@@ -56,15 +56,15 @@ public static class AccessEndpoints
         return Results.Ok(new TokenResponse(token.AccessToken, "Bearer", token.ExpiresInSeconds));
     }
 
-    private static async Task<IResult> GetMe(HttpContext http, AccessService access)
+    private static async Task<IResult> GetMe(HttpContext http, CachedAccess access)
     {
-        var me = await access.ResolveAsync(http.User.ClientId(), http.RequestAborted);
+        var me = await access.ResolveAsync(http.User.TenantId(), http.User.ClientId(), http.RequestAborted);
         return me is null
             ? Results.NotFound()
             : Results.Ok(new TenantView(me.TenantId, me.Plan, me.Roles, me.Permissions, me.MaxBatchSize));
     }
 
-    private static async Task<IResult> ChangePlan(PlanChangeRequest request, HttpContext http, AccessService access)
+    private static async Task<IResult> ChangePlan(PlanChangeRequest request, HttpContext http, CachedAccess access)
     {
         if (string.IsNullOrWhiteSpace(request.Plan) || !await access.ChangePlanAsync(http.User.TenantId(), request.Plan, http.RequestAborted))
         {
@@ -76,7 +76,7 @@ public static class AccessEndpoints
     }
 
     private static async Task<IResult> MarketplaceWebhook(
-        MarketplaceEvent body, HttpContext http, AccessService access, IOptions<AccessOptions> options)
+        MarketplaceEvent body, HttpContext http, CachedAccess access, IOptions<AccessOptions> options)
     {
         var expected = options.Value.WebhookSecret;
         var given = http.Request.Headers["X-Webhook-Secret"].ToString();

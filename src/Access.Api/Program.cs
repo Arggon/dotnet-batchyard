@@ -14,6 +14,17 @@ builder.Services.Configure<AccessOptions>(builder.Configuration.GetSection(Acces
 builder.Services.AddDbContext<AccessDbContext>(o => o.UseSqlServer(connectionString));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<AccessService>();
+builder.Services.AddScoped<CachedAccess>();
+if (builder.Configuration.GetConnectionString("Redis") is { Length: > 0 } redis)
+{
+    builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redis);
+}
+else
+{
+    // Without Redis (e.g. a quick `dotnet run`), fall back to a per-process cache.
+    builder.Services.AddDistributedMemoryCache();
+}
+
 builder.Services.AddBatchyardJwt(builder.Configuration);
 builder.Services.AddScoped<IPermissionSource, LivePermissionSource>();
 builder.Services.AddSingleton<JwtTokenIssuer>();

@@ -1,5 +1,5 @@
 # One command: docker compose up --build
-# Local only. The SA password below is for a throwaway dev container, never a real secret.
+# Local only. Every password, key and secret below is a throwaway dev value, never a real secret.
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -28,4 +28,34 @@ services:
     restart: on-failure
     depends_on:
       sqlserver:
+        condition: service_healthy
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  access-api:
+    build:
+      context: .
+      dockerfile: src/Access.Api/Dockerfile
+    environment:
+      ConnectionStrings__Access: "Server=sqlserver,1433;Database=batchyard_access;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
+      ConnectionStrings__Redis: "redis:6379"
+      Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
+      Access__WebhookSecret: "local-dev-only-webhook-secret"
+      Access__Seed__TenantName: "Demo Parts Co"
+      Access__Seed__Plan: "Pro"
+      Access__Seed__AdminClientId: "demo-admin"
+      Access__Seed__AdminClientSecret: "local-dev-only-client-secret"
+    ports:
+      - "8081:8080"
+    restart: on-failure
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
         condition: service_healthy

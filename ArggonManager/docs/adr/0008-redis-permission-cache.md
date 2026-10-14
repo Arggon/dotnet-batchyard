@@ -10,7 +10,7 @@ Access resolves a client's effective permissions on every protected request and 
 
 ## Decision
 
-Cache-aside through `IDistributedCache` backed by Redis: key `access:perm:{tenant}:{client}`, 10-minute TTL. A plan change removes the tenant's keys (tracked in a per-tenant key set) right after the change commits. When RabbitMQ arrives in M3, the same invalidation hangs off the `plan.changed` event.
+Cache-aside through `IDistributedCache` backed by Redis: key `access:perm:{tenant}:{generation}:{client}`, 10-minute TTL. A plan change writes a new per-tenant generation right after the change commits, so all of the tenant's old entries stop being read at once and expire on their TTL (no key scans, works with plain `IDistributedCache`). When RabbitMQ arrives in M3, the same invalidation hangs off the `plan.changed` event.
 
 ## Consequences
 
