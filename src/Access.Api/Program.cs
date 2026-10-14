@@ -18,6 +18,7 @@ builder.Services.AddDbContext<AccessDbContext>(o => o.UseSqlServer(connectionStr
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<AccessService>();
 builder.Services.AddScoped<CachedAccess>();
+builder.Services.AddScoped<UsageQueries>();
 if (builder.Configuration.GetConnectionString("Redis") is { Length: > 0 } redis)
 {
     builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redis);
@@ -35,6 +36,8 @@ if (builder.Configuration.GetValue("Messaging:Enabled", true))
     builder.Services.AddBatchyardMessaging(builder.Configuration.GetSection("Messaging").Get<MessagingOptions>() ?? new MessagingOptions());
     builder.Services.AddOutboxDispatcher(connectionString);
     builder.Services.AddMessageConsumer<PlanChangedHandler>(PlanChangedHandler.Queue);
+    // ingest.completed from the ingest service feeds the per-tenant usage meter (ADR 0018).
+    builder.Services.AddMessageConsumer<IngestUsageHandler>(IngestUsageHandler.Queue);
 }
 
 builder.Services.AddBatchyardJwt(builder.Configuration);

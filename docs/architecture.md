@@ -12,7 +12,7 @@ flowchart LR
         access["Access.Api :8081<br/>token, plans, roles, permissions"]
         api["Ingest.Api :8080<br/>items, batches"]
         payments["Payments.Api :8082<br/>commands + queries via mediator"]
-        db[("SQL Server 2022<br/>batchyard (items)<br/>batchyard_access (catalog, outbox)<br/>batchyard_payments (write, outbox, read model)")]
+        db[("SQL Server 2022<br/>batchyard (items)<br/>batchyard_access (catalog, outbox, usage)<br/>batchyard_payments (write, outbox, read model)")]
         redis[("Redis<br/>permission cache")]
         mq{{"RabbitMQ<br/>exchange batchyard.events"}}
     end
@@ -28,6 +28,8 @@ flowchart LR
     access -->|"outbox: plan.changed"| mq
     mq -->|"queue payments.read-model"| payments
     mq -->|"queue access.cache → bump generation"| access
+    api -->|"outbox: ingest.completed"| mq
+    mq -->|"queue access.usage → daily usage"| access
 ```
 
 Ingest never calls Access. It validates the token's signature and reads `tenant_id`, `perm` and `max_batch` from it (ADR 0006).

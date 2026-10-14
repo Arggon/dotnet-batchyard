@@ -11,6 +11,7 @@ public class AuthorizationMatrixTests(AccessApiFixture api)
     {
         // plan, admin client, endpoint, expected
         { "Free", false, "GET /v1/tenants/me", HttpStatusCode.OK },
+        { "Free", false, "GET /v1/tenants/me/usage", HttpStatusCode.OK },
         { "Free", false, "PUT /v1/tenants/me/plan", HttpStatusCode.Forbidden },
         { "Free", false, "GET /v1/exports/items", HttpStatusCode.Forbidden },
         { "Free", true, "PUT /v1/tenants/me/plan", HttpStatusCode.OK },
@@ -37,6 +38,7 @@ public class AuthorizationMatrixTests(AccessApiFixture api)
 
     [Theory]
     [InlineData("GET /v1/tenants/me")]
+    [InlineData("GET /v1/tenants/me/usage")]
     [InlineData("PUT /v1/tenants/me/plan")]
     [InlineData("GET /v1/exports/items")]
     public async Task Endpoint_without_a_token_returns_401(string endpoint)
@@ -60,6 +62,7 @@ public class AuthorizationMatrixTests(AccessApiFixture api)
     private static Task<HttpResponseMessage> Call(HttpClient http, string endpoint) => endpoint switch
     {
         "GET /v1/tenants/me" => http.GetAsync(new Uri("/v1/tenants/me", UriKind.Relative)),
+        "GET /v1/tenants/me/usage" => http.GetAsync(new Uri("/v1/tenants/me/usage", UriKind.Relative)),
         "PUT /v1/tenants/me/plan" => http.PutAsJsonAsync("/v1/tenants/me/plan", new { plan = "Pro" }),
         "GET /v1/exports/items" => http.GetAsync(new Uri("/v1/exports/items", UriKind.Relative)),
         _ => throw new ArgumentOutOfRangeException(nameof(endpoint)),

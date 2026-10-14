@@ -10,7 +10,7 @@ Other parts of the system (search indexing, notifications) will want to know whe
 
 ## Decision
 
-After a batch commits, ingest publishes `ingest.completed` with counts only (tenant, created, updated, rejected). The row is written to ingest's outbox inside the same transaction as the upsert, using the shared dispatcher from ADR 0011. No consumer ships in M4.
+After a batch commits, ingest publishes `ingest.completed` with counts only (tenant, created, updated, rejected). The row is written to ingest's outbox inside the same transaction as the upsert, using the shared dispatcher from ADR 0011. No consumer ships in M4; ADR 0018 adds one (the Access usage meter).
 
 ## Consequences
 

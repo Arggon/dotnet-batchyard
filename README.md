@@ -91,7 +91,7 @@ flowchart LR
 - **Partial failure, never partial corruption.** Bad rows are rejected with a reason and good rows commit. A database error rolls back the whole batch.
 - **Duplicates inside one batch** are handled in SQL: the first one wins and the rest are reported, so `MERGE` never fails on them.
 - **Safe retries.** Send an `Idempotency-Key` header and a retried request gets the original response back. Reusing the key with a different body returns 409.
-- **ingest.completed.** Each committed batch writes one `ingest.completed` event (counts only) to an outbox in the same transaction, so a rolled-back batch announces nothing ([ADR 0017](ArggonManager/docs/adr/0017-ingest-completed-event.md)). No service consumes it yet.
+- **ingest.completed.** Each committed batch writes one `ingest.completed` event (counts only) to an outbox in the same transaction, so a rolled-back batch announces nothing ([ADR 0017](ArggonManager/docs/adr/0017-ingest-completed-event.md)). Access consumes it into a per-tenant daily usage meter, `GET /v1/tenants/me/usage`, with an inbox so a redelivered event is counted once ([ADR 0018](ArggonManager/docs/adr/0018-usage-meter-consumes-ingest-completed.md)).
 - **The SQL is code.** Tables, the TVP type and the procedures live in [`db/ingest/`](db/ingest/) and are applied in order by DbUp.
 
 ## How the extraction works
