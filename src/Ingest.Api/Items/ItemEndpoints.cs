@@ -1,4 +1,4 @@
-using BuildingBlocks;
+using BuildingBlocks.Auth;
 using Ingest.Data;
 using Microsoft.Extensions.Options;
 
@@ -11,12 +11,15 @@ public static class ItemEndpoints
         var items = app.MapGroup("/v1/items").WithTags("Items");
 
         items.MapPost("", UpsertOne)
+            .RequirePermission("items:write")
             .WithSummary("Create or update one item (one database round trip per item).");
         // Google AIP-136 style custom method. Mapped outside the group so the route is /v1/items:batch, not /v1/items/:batch.
         app.MapPost("/v1/items:batch", UpsertBatch)
+            .RequirePermission("ingest:batch")
             .WithTags("Items")
             .WithSummary("Create or update up to MaxBatchSize items in one call (TVP + MERGE).");
         items.MapGet("{sku}", GetOne)
+            .RequirePermission("items:read")
             .WithSummary("Read one item.");
 
         return app;
@@ -25,10 +28,7 @@ public static class ItemEndpoints
     private static async Task<IResult> UpsertOne(
         ItemRequest request, HttpContext http, IItemRepository repository, IIdempotencyStore idempotency)
     {
-        if (!TenantHeader.TryGet(http.Request, out var tenantId))
-        {
-            return MissingTenant();
-        }
+        var tenantId = http.User.TenantId();
 
         var (row, error) = ItemValidator.Validate(request);
         if (row is null)
@@ -52,12 +52,10 @@ public static class ItemEndpoints
         IIdempotencyStore idempotency,
         IOptions<IngestOptions> options)
     {
-        if (!TenantHeader.TryGet(http.Request, out var tenantId))
-        {
-            return MissingTenant();
-        }
+        var tenantId = http.User.TenantId();
 
-        var max = options.Value.MaxBatchSize;
+        // The smaller of the service limit and the caller's plan limit (max_batch claim).
+        var max = Math.Min(options.Value.MaxBatchSize, http.User.MaxBatch() ?? options.Value.MaxBatchSize);
         var count = request.Items?.Count ?? 0;
         if (count == 0 || count > max)
         {
@@ -116,17 +114,9 @@ public static class ItemEndpoints
 
     private static async Task<IResult> GetOne(string sku, HttpContext http, IItemRepository repository)
     {
-        if (!TenantHeader.TryGet(http.Request, out var tenantId))
-        {
-            return MissingTenant();
-        }
+        var tenantId = http.User.TenantId();
 
         var item = await repository.FindAsync(tenantId, sku, http.RequestAborted);
         return item is null ? Results.NotFound() : Results.Ok(item);
     }
-
-    private static IResult MissingTenant() => Results.Problem(
-        statusCode: StatusCodes.Status400BadRequest,
-        title: "Missing tenant",
-        detail: $"Send the tenant id as a GUID in the {TenantHeader.Name} header.");
 }

@@ -1,3 +1,4 @@
+using BuildingBlocks.Auth;
 using Ingest.Api.Items;
 using Ingest.Data;
 
@@ -9,6 +10,7 @@ var connectionString = builder.Configuration.GetConnectionString("Ingest")
 builder.Services.Configure<IngestOptions>(builder.Configuration.GetSection(IngestOptions.Section));
 builder.Services.AddSingleton<IItemRepository>(_ => new SqlItemRepository(connectionString));
 builder.Services.AddSingleton<IIdempotencyStore>(_ => new SqlIdempotencyStore(connectionString));
+builder.Services.AddBatchyardJwt(builder.Configuration);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
@@ -21,6 +23,8 @@ if (app.Configuration.GetValue(IngestOptions.Section + ":RunMigrations", true))
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapOpenApi();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));

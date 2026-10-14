@@ -25,10 +25,11 @@ jobs:
       - name: Start the stack
         run: docker compose up --build --detach --wait --wait-timeout 300
 
-      - name: Wait for the API
+      - name: Wait for the APIs
         run: |
-          for _ in $(seq 1 60); do curl -fsS http://localhost:8080/health && exit 0; sleep 2; done
-          exit 1
+          for url in http://localhost:8081 http://localhost:8080; do
+            for _ in $(seq 1 60); do curl -fsS "$url/health" && break; sleep 2; done
+          done
 
       - name: Run k6
         run: >

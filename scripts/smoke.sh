@@ -1,28 +1,38 @@
 #!/usr/bin/env bash
 # Smoke test against a running stack (docker compose up). Used by CI; handy locally too.
+# Uses the demo client seeded by docker-compose.yml (local-only credentials).
 set -euo pipefail
 BASE_URL="${BASE_URL:-http://localhost:8080}"
-TENANT="${TENANT:-$(cat /proc/sys/kernel/random/uuid)}"
+ACCESS_URL="${ACCESS_URL:-http://localhost:8081}"
+CLIENT_ID="${CLIENT_ID:-demo-admin}"
+CLIENT_SECRET="${CLIENT_SECRET:-local-dev-only-client-secret}"
 
-for _ in $(seq 1 60); do
-  curl -fsS "$BASE_URL/health" >/dev/null 2>&1 && break
-  sleep 2
-done
+wait_for() {
+  for _ in $(seq 1 60); do
+    curl -fsS "$1/health" >/dev/null 2>&1 && return 0
+    sleep 2
+  done
+  echo "$1 did not become healthy" >&2
+  return 1
+}
+wait_for "$ACCESS_URL"
+wait_for "$BASE_URL"
 
+token=$(curl -fsS -X POST "$ACCESS_URL/v1/auth/token" -H "Content-Type: application/json" \
+  -d "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
+echo "access token issued"
+
+# Without a token, ingest must refuse.
+status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/v1/items:batch" -H "Content-Type: application/json" -d '{"items":[]}')
+[ "$status" = "401" ] || { echo "expected 401 without a token, got $status" >&2; exit 1; }
+
+run=$(date +%s)
 response=$(curl -fsS -X POST "$BASE_URL/v1/items:batch" \
-  -H "Content-Type: application/json" -H "X-Tenant-Id: $TENANT" \
-  -d '{"items":[
-        {"sku":"BRK-001","name":"Brake pad","price":12.5,"currency":"USD","quantity":40},
-        {"sku":"FLT-002","name":"Oil filter","price":-1,"currency":"USD","quantity":3}
-      ]}')
+  -H "Content-Type: application/json" -H "Authorization: Bearer $token" \
+  -d "{\"items\":[
+        {\"sku\":\"BRK-$run\",\"name\":\"Brake pad\",\"price\":12.5,\"currency\":\"USD\",\"quantity\":40},
+        {\"sku\":\"FLT-$run\",\"name\":\"Oil filter\",\"price\":-1,\"currency\":\"USD\",\"quantity\":3}
+      ]}")
 echo "$response"
 echo "$response" | grep -q '"created":1' && echo "$response" | grep -q '"rejected":1'
-ACCESS_URL="${ACCESS_URL:-http://localhost:8081}"
-for _ in $(seq 1 60); do
-  curl -fsS "$ACCESS_URL/health" >/dev/null 2>&1 && break
-  sleep 2
-done
-curl -fsS -X POST "$ACCESS_URL/v1/auth/token" -H "Content-Type: application/json" \
-  -d '{"clientId":"demo-admin","clientSecret":"local-dev-only-client-secret"}' | grep -q '"accessToken"'
-echo "access token issued"
 echo "smoke test passed"

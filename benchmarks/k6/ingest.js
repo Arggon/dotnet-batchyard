@@ -3,13 +3,17 @@
 //   k6 run benchmarks/k6/ingest.js                       # against http://localhost:8080
 //   k6 run -e BASE_URL=http://host:8080 -e DURATION=60s benchmarks/k6/ingest.js
 //
-// Each virtual user writes under its own tenant with unique SKUs, so every request inserts new rows.
+// The setup step gets a token from the access service (default: the demo client seeded by docker compose).
+// SKUs are unique per run, VU and iteration, so every request inserts new rows.
 import http from 'k6/http';
 import { check } from 'k6';
 import { Counter } from 'k6/metrics';
 import exec from 'k6/execution';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
+const ACCESS_URL = __ENV.ACCESS_URL || 'http://localhost:8081';
+const CLIENT_ID = __ENV.CLIENT_ID || 'demo-admin';
+const CLIENT_SECRET = __ENV.CLIENT_SECRET || 'local-dev-only-client-secret';
 const DURATION = __ENV.DURATION || '30s';
 const BATCH_SIZE = parseInt(__ENV.BATCH_SIZE || '500', 10);
 const SINGLE_VUS = parseInt(__ENV.SINGLE_VUS || '20', 10);
@@ -39,29 +43,30 @@ function addSeconds(duration, extra) {
   return match ? `${parseInt(match[1], 10) + extra}s` : duration;
 }
 
-function tenantFor(scenario) {
-  // A stable, valid GUID per VU and scenario.
-  const id = exec.vu.idInTest.toString(16).padStart(8, '0');
-  return `${id}-0000-4000-8000-${scenario === 'single' ? '00000000000a' : '00000000000b'}`;
+export function setup() {
+  const res = http.post(`${ACCESS_URL}/v1/auth/token`, JSON.stringify({ clientId: CLIENT_ID, clientSecret: CLIENT_SECRET }),
+    { headers: { 'Content-Type': 'application/json' } });
+  if (res.status !== 200) throw new Error(`token request failed: ${res.status}`);
+  return { token: res.json('accessToken') };
 }
 
 function item(n) {
   return { sku: `K6-${n}`, name: `Load part ${n}`, price: 9.99, currency: 'USD', quantity: 1 };
 }
 
-const headers = (scenario) => ({ 'Content-Type': 'application/json', 'X-Tenant-Id': tenantFor(scenario) });
+const headers = (data) => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${data.token}` });
 const runId = Date.now().toString(36);
 
-export function single() {
-  const n = `${runId}-${exec.vu.iterationInScenario}`;
-  const res = http.post(`${BASE_URL}/v1/items`, JSON.stringify(item(n)), { headers: headers('single') });
+export function single(data) {
+  const n = `${runId}-s${exec.vu.idInTest}-${exec.vu.iterationInScenario}`;
+  const res = http.post(`${BASE_URL}/v1/items`, JSON.stringify(item(n)), { headers: headers(data) });
   if (check(res, { 'single: 201 created': (r) => r.status === 201 })) itemsSingle.add(1);
 }
 
-export function batch() {
-  const prefix = `${runId}-${exec.vu.iterationInScenario}`;
+export function batch(data) {
+  const prefix = `${runId}-b${exec.vu.idInTest}-${exec.vu.iterationInScenario}`;
   const items = Array.from({ length: BATCH_SIZE }, (_, i) => item(`${prefix}-${i}`));
-  const res = http.post(`${BASE_URL}/v1/items:batch`, JSON.stringify({ items }), { headers: headers('batch'), timeout: '60s' });
+  const res = http.post(`${BASE_URL}/v1/items:batch`, JSON.stringify({ items }), { headers: headers(data), timeout: '60s' });
   if (check(res, { 'batch: all created': (r) => r.status === 200 && r.json('created') === BATCH_SIZE })) {
     itemsBatch.add(BATCH_SIZE);
   }

@@ -23,6 +23,7 @@ services:
     environment:
       ConnectionStrings__Ingest: "Server=sqlserver,1433;Database=batchyard;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
       Ingest__MaxBatchSize: "5000"
+      Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
     ports:
       - "8080:8080"
     restart: on-failure
