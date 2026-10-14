@@ -20,3 +20,6 @@ The access service owns tenants, plans, roles, permissions and assignments, and 
 - [ ] Authorization matrix tests (role x endpoint -> status) are data-driven xUnit theories
 
 ## Notes
+
+### 2026-10-14 @Arggon
+Ready for acceptance (Gonzalo): all child tasks are done with evidence (merged PRs, main CI green at 43d80b5 https://github.com/Arggon/dotnet-batchyard/actions/runs/38561095595). The container stays open on purpose: product acceptance is a human decision. To accept, add a comment 'accept: approve' (or 'accept: changes-requested'), then close it. Deliverables: #11 #12 #13. Open note: spec-access-plans-002 is still 'proposed'.

@@ -16,8 +16,11 @@ Access publishes plan.changed through its own outbox and clears the permission c
 
 ## Acceptance
 
-- [ ] Plan change writes plan.changed in the same transaction
-- [ ] Access consumer bumps the tenant cache generation on plan.changed
-- [ ] Test: plan change -> event -> cache cleared, against real RabbitMQ and Redis
+- [x] Plan change writes plan.changed in the same transaction
+- [x] Access consumer bumps the tenant cache generation on plan.changed
+- [x] Test: plan change -> event -> cache cleared, against real RabbitMQ and Redis
 
 ## Notes
+
+### 2026-10-14 @Arggon
+Done-gate evidence: shipped in PR #19, landed on main via #26 (d7e18fa). main CI green at 43d80b5: ci https://github.com/Arggon/dotnet-batchyard/actions/runs/38561095595 , codeql .../runs/38561095612 , arggon .../runs/38561095609. Acceptance boxes ticked after checking each against main.

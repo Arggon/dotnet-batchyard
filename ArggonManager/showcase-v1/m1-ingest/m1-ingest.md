@@ -20,3 +20,6 @@ Milestone 1, publishable on its own: the batch endpoint story (TVP + stored proc
 - [ ] Story m1-ingest-endpoints accepted
 
 ## Notes
+
+### 2026-10-14 @Arggon
+Awaiting Gonzalo: every task under this epic is done. The 'Story … accepted' boxes stay unticked until the stories are accepted.

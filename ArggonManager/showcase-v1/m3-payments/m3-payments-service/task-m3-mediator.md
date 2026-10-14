@@ -16,8 +16,11 @@ The hand-written mediator (ADR 0010), pipeline behaviors and the command/query h
 
 ## Acceptance
 
-- [ ] Mediator (~60 lines) with validation, logging and transaction behaviors
-- [ ] CreateInvoice, CapturePayment, RefundPayment, GetInvoice handlers with unit tests
-- [ ] Money as decimal + currency
+- [x] Mediator (~60 lines) with validation, logging and transaction behaviors
+- [x] CreateInvoice, CapturePayment, RefundPayment, GetInvoice handlers with unit tests
+- [x] Money as decimal + currency
 
 ## Notes
+
+### 2026-10-14 @Arggon
+Done-gate evidence: shipped in PR #16, landed on main via #26 (d7e18fa). main CI green at 43d80b5: ci https://github.com/Arggon/dotnet-batchyard/actions/runs/38561095595 , codeql .../runs/38561095612 , arggon .../runs/38561095609. Acceptance boxes ticked after checking each against main.

@@ -20,3 +20,6 @@ Milestone 4: the "microservice extracted from a monolith" story. A deliberately 
 - [ ] Story m4-observability accepted
 
 ## Notes
+
+### 2026-10-14 @Arggon
+Awaiting Gonzalo: every task under this epic is done. The 'Story … accepted' boxes stay unticked until the stories are accepted.

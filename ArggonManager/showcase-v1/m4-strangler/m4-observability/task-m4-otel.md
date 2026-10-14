@@ -2,7 +2,7 @@
 type: task
 status: done
 id: task-m4-otel
-title: "OpenTelemetry tracing"
+title: OpenTelemetry tracing
 parent: m4-observability
 labels: []
 created: "2026-10-14"
@@ -16,8 +16,11 @@ BuildingBlocks.Observability: traces (ASP.NET Core, HttpClient, SqlClient, messa
 
 ## Acceptance
 
-- [ ] Every service and the gateway export traces and metrics when an OTLP endpoint is set
-- [ ] Test: publish and consume share one trace id
-- [ ] Aspire dashboard in compose
+- [x] Every service and the gateway export traces and metrics when an OTLP endpoint is set
+- [x] Test: publish and consume share one trace id
+- [x] Aspire dashboard in compose
 
 ## Notes
+
+### 2026-10-14 @Arggon
+Done-gate evidence: shipped in PR #24, landed on main via #26 (d7e18fa). main CI green at 43d80b5: ci https://github.com/Arggon/dotnet-batchyard/actions/runs/38561095595 , codeql .../runs/38561095612 , arggon .../runs/38561095609. Acceptance boxes ticked after checking each against main.
