@@ -2,26 +2,34 @@
 
 Two views: the system as it is today (milestone 1), and the full target from the roadmap. Solid boxes exist in the code; dashed boxes are planned.
 
-## Today (M1)
+## Today (M2)
 
 ```mermaid
 flowchart LR
     client([API client / demo client / k6])
+    market([Marketplace webhook])
     subgraph compose [docker compose]
-        api["Ingest.Api<br/>ASP.NET Core Minimal API<br/>.NET 10"]
-        db[("SQL Server 2022<br/>Items, IdempotencyKeys<br/>usp_UpsertItem, usp_UpsertItemsBatch")]
+        access["Access.Api :8081<br/>token, plans, roles, permissions"]
+        api["Ingest.Api :8080<br/>items, batches"]
+        db[("SQL Server 2022<br/>batchyard (items)<br/>batchyard_access (catalog, clients)")]
+        redis[("Redis<br/>permission cache")]
     end
-    client -->|"POST /v1/items<br/>POST /v1/items:batch<br/>X-Tenant-Id, Idempotency-Key"| api
+    client -->|"1. POST /v1/auth/token"| access
+    client -->|"2. Bearer JWT<br/>POST /v1/items:batch"| api
+    market -->|"subscribe / unsubscribe"| access
+    access -->|EF Core| db
+    access -->|cache-aside| redis
     api -->|"Dapper: stored procedures,<br/>one TVP per batch"| db
-    api -.->|"DbUp migrations on startup<br/>(db/ingest/*.sql)"| db
 ```
+
+Ingest never calls Access. It validates the token's signature and reads `tenant_id`, `perm` and `max_batch` from it (ADR 0006).
 
 ### Inside the ingest service
 
 ```mermaid
 flowchart TB
     subgraph api [Ingest.Api]
-        endpoints["ItemEndpoints<br/>routes, tenant header, Problem Details"]
+        endpoints["ItemEndpoints<br/>routes, RequirePermission, Problem Details"]
         validator["ItemValidator<br/>in-memory rules"]
         idem["Idempotency<br/>hash body, replay or 409"]
     end
@@ -30,7 +38,7 @@ flowchart TB
         store["SqlIdempotencyStore"]
         migrator["DatabaseMigrator<br/>DbUp"]
     end
-    bb["BuildingBlocks<br/>TenantHeader"]
+    bb["BuildingBlocks.Auth<br/>JWT validation, tenant + permissions from claims"]
     endpoints --> validator
     endpoints --> idem
     endpoints --> repo
@@ -47,7 +55,8 @@ sequenceDiagram
     participant C as Client
     participant A as Ingest.Api
     participant S as SQL Server
-    C->>A: POST /v1/items:batch (N rows)
+    C->>A: POST /v1/items:batch (N rows, Bearer JWT)
+    A->>A: check signature, ingest:batch, N ≤ max_batch
     A->>A: validate each row in memory
     Note over A: invalid rows → rejected + reason
     A->>S: EXEC usp_UpsertItemsBatch @Rows (one TVP)
@@ -61,24 +70,26 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     client([Clients])
-    gw["Gateway (YARP)<br/>route-level strangler switch"]
+    gw["Gateway (YARP)<br/>route-level strangler switch"]:::planned
     ingest[Ingest.Api]
-    access["Access.Api<br/>plans → roles → permissions"]:::planned
+    access["Access.Api<br/>plans → roles → permissions"]
     payments["Payments.Api<br/>CQRS + mediator"]:::planned
     legacy["Legacy.Monolith<br/>the before"]:::planned
     sql[(SQL Server)]
-    redis[(Redis)]:::planned
+    redis[(Redis)]
     mq{{RabbitMQ<br/>ingest.completed, payment.captured, plan.changed}}:::planned
     otel["OpenTelemetry → Aspire dashboard"]:::planned
 
-    client --> gw
+    client -.-> gw
+    client --> access
+    client --> ingest
     gw --> ingest
     gw -.-> access
     gw -.-> payments
     gw -.-> legacy
     ingest --> sql
-    access -.-> sql
-    access -.-> redis
+    access --> sql
+    access --> redis
     payments -.-> sql
     ingest -.->|outbox| mq
     payments -.->|outbox| mq
@@ -90,7 +101,7 @@ flowchart LR
 | Milestone | Adds |
 |---|---|
 | M1 ✅ | Ingest service, SQL Server, compose, CI |
-| M2 | Access service, JWT, Redis permission cache |
+| M2 ✅ | Access service, JWT, Redis permission cache |
 | M3 | Payments service, mediator, outbox + RabbitMQ, read model |
 | M4 | Legacy monolith, YARP gateway, OpenTelemetry |
 

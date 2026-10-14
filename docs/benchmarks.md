@@ -2,7 +2,18 @@
 
 All numbers on this page were measured in this repo. None are copied from the CV.
 
-## End to end over HTTP: 50,000 items (demo client)
+## Re-measured with JWT auth (M2)
+
+Since M2, every request carries a bearer token that Ingest validates. Both tools were re-run on the same VM on 2026-10-14 (API Release builds on the host; SQL Server and Redis in Docker):
+
+| Tool | one-by-one / single | batch | Batch advantage |
+|---|---:|---:|---:|
+| Demo client, 50,000 items | 87.3 s (573 items/s) | 1.8 s (28,045 items/s) | 98.0% less time |
+| k6 single (20 VUs) vs batch (5 VUs × 500) | p50 3.5 ms, p95 6.2 ms, 4,614 items/s | p50 23.1 ms, p95 44.9 ms, 80,917 items/s | ~17.5× items/s |
+
+The single-item path barely moved. Batch throughput came out lower than in the M1 run below (80,917 vs 105,067 items/s on k6, 1.8 s vs 1.3 s for the demo). Some of that is token validation on each request, and some is VM noise; I haven't separated the two. The M1 numbers are kept below as history.
+
+## End to end over HTTP: 50,000 items (demo client, M1, before auth)
 
 `tools/Ingest.DemoClient` imports the same 50,000 items into a running API twice: first with one `POST /v1/items` per item, then with `POST /v1/items:batch` in chunks of 5,000. Each run uses a fresh tenant, so both runs insert 50,000 new rows. Requests are sent one after another (no parallelism), the way a simple client loop would.
 
@@ -18,11 +29,11 @@ Measured 2026-10-14 on the VM described under Environment below. The API ran as 
 Reproduce:
 
 ```bash
-docker compose up --build -d
+docker compose up --build -d   # seeds the demo client the tools use by default
 dotnet run -c Release --project tools/Ingest.DemoClient -- --items 50000 --batch-size 5000
 ```
 
-## Under concurrent load (k6)
+## Under concurrent load (k6, M1, before auth)
 
 `benchmarks/k6/ingest.js` runs two scenarios one after the other, 30 s each:
 
