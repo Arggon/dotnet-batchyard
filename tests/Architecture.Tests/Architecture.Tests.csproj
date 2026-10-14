@@ -5,5 +5,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ingest.Api\Ingest.Api.csproj" />
     <ProjectReference Include="..\..\src\Ingest.Data\Ingest.Data.csproj" />
+    <ProjectReference Include="..\..\src\Access.Data\Access.Data.csproj" />
   </ItemGroup>
 </Project>

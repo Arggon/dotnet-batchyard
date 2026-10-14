@@ -14,4 +14,15 @@ public class LayerTests
 
         result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    [Fact]
+    public void Access_data_layer_does_not_depend_on_aspnetcore()
+    {
+        var result = Types.InAssembly(typeof(Access.Data.AccessService).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny("Access.Api", "Microsoft.AspNetCore")
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }
