@@ -1,13 +1,16 @@
 using Microsoft.Extensions.DependencyInjection;
 using Payments.Application;
 using Payments.Application.Domain;
+using Payments.Application.Invoices;
 using Payments.Application.Mediator;
 
 namespace Payments.UnitTests;
 
 /// <summary>In-memory stand-ins for the data layer. Data-path behavior is covered by integration tests against SQL Server.</summary>
-internal sealed class Fakes : IInvoiceRepository, IPaymentRepository, IPaymentGateway, IEventOutbox, IUnitOfWork
+internal sealed class Fakes : IInvoiceRepository, IPaymentRepository, IPaymentGateway, IEventOutbox, IUnitOfWork, IPaymentsReadModel
 {
+    public int? LastTake { get; private set; }
+
     public Dictionary<Guid, Invoice> Invoices { get; } = [];
     public List<Payment> Payments { get; } = [];
     public List<(string Type, object Payload)> Events { get; } = [];
@@ -69,6 +72,12 @@ internal sealed class Fakes : IInvoiceRepository, IPaymentRepository, IPaymentGa
     public Task CommitAsync(CancellationToken cancellationToken) => Record("commit");
     public Task RollbackAsync(CancellationToken cancellationToken) => Record("rollback");
 
+    public Task<IReadOnlyList<PaymentHistoryItem>> ListAsync(Guid tenantId, int take, CancellationToken ct)
+    {
+        LastTake = take;
+        return Task.FromResult<IReadOnlyList<PaymentHistoryItem>>([]);
+    }
+
     private Task Record(string entry)
     {
         Log.Add(entry);
@@ -83,6 +92,7 @@ internal sealed class Fakes : IInvoiceRepository, IPaymentRepository, IPaymentGa
         services.AddSingleton<IPaymentGateway>(this);
         services.AddSingleton<IEventOutbox>(this);
         services.AddSingleton<IUnitOfWork>(this);
+        services.AddSingleton<IPaymentsReadModel>(this);
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
     }
 }

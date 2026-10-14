@@ -131,4 +131,15 @@ public class HandlerTests
     {
         await Should.ThrowAsync<RequestValidationException>(() => Send(new CapturePayment(_tenant, Guid.NewGuid(), key)));
     }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(50, 50)]
+    [InlineData(10_000, 200)]
+    public async Task Payment_history_page_size_is_clamped(int requested, int expected)
+    {
+        await Send(new ListTenantPayments(_tenant, requested));
+
+        _fakes.LastTake.ShouldBe(expected);
+    }
 }
