@@ -107,3 +107,22 @@ services:
         condition: service_healthy
       ingest-api:
         condition: service_started # ingest-api owns and migrates the schema
+
+  gateway:
+    # Single entry point (ADR 0014). Move a route back to the monolith with e.g.
+    # ReverseProxy__Routes__items-batch__ClusterId: legacy
+    build:
+      context: .
+      dockerfile: src/Gateway/Dockerfile
+    environment:
+      ReverseProxy__Clusters__ingest__Destinations__d1__Address: "http://ingest-api:8080/"
+      ReverseProxy__Clusters__access__Destinations__d1__Address: "http://access-api:8080/"
+      ReverseProxy__Clusters__payments__Destinations__d1__Address: "http://payments-api:8080/"
+      ReverseProxy__Clusters__legacy__Destinations__d1__Address: "http://legacy-monolith:8080/"
+    ports:
+      - "8000:8080"
+    depends_on:
+      - ingest-api
+      - access-api
+      - payments-api
+      - legacy-monolith

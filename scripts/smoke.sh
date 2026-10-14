@@ -6,6 +6,7 @@ BASE_URL="${BASE_URL:-http://localhost:8080}"
 ACCESS_URL="${ACCESS_URL:-http://localhost:8081}"
 PAYMENTS_URL="${PAYMENTS_URL:-http://localhost:8082}"
 LEGACY_URL="${LEGACY_URL:-http://localhost:8083}"
+GATEWAY_URL="${GATEWAY_URL:-http://localhost:8000}"
 CLIENT_ID="${CLIENT_ID:-demo-admin}"
 CLIENT_SECRET="${CLIENT_SECRET:-local-dev-only-client-secret}"
 
@@ -21,6 +22,7 @@ wait_for "$ACCESS_URL"
 wait_for "$BASE_URL"
 wait_for "$PAYMENTS_URL"
 wait_for "$LEGACY_URL"
+wait_for "$GATEWAY_URL"
 
 token=$(curl -fsS -X POST "$ACCESS_URL/v1/auth/token" -H "Content-Type: application/json" \
   -d "{\"clientId\":\"$CLIENT_ID\",\"clientSecret\":\"$CLIENT_SECRET\"}" | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
@@ -62,4 +64,15 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 curl -fsS "$PAYMENTS_URL/v1/payments" -H "Authorization: Bearer $token" | grep -q "$invoice" || { echo "payment never reached the read model" >&2; exit 1; }
+
+# Gateway: one entry point; X-Backend says who answered (ADR 0014).
+backend_of() { curl -s -o /dev/null -D - "$@" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-backend" {print $2}'; }
+b=$(backend_of -X POST "$GATEWAY_URL/v1/items:batch" -H "Content-Type: application/json" -H "Authorization: Bearer $token" \
+  -d "{\"items\":[{\"sku\":\"GW-$run\",\"name\":\"Wiper\",\"price\":8,\"currency\":\"USD\",\"quantity\":2}]}")
+[ "$b" = "ingest" ] || { echo "gateway sent the batch to '$b', expected ingest" >&2; exit 1; }
+b=$(backend_of "$GATEWAY_URL/v1/reports/stock" -H "Authorization: Bearer $token")
+[ "$b" = "legacy" ] || { echo "gateway sent the report to '$b', expected legacy" >&2; exit 1; }
+b=$(backend_of "$GATEWAY_URL/v1/payments" -H "Authorization: Bearer $token")
+[ "$b" = "payments" ] || { echo "gateway sent payments to '$b'" >&2; exit 1; }
+echo "gateway routes ok (batch -> ingest, report -> legacy, payments -> payments)"
 echo "smoke test passed"

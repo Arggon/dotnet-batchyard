@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 id: task-m4-gateway
 title: "YARP gateway with per-route switching"
 parent: m4-extraction
