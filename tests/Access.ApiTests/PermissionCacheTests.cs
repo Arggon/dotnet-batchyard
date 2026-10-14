@@ -26,19 +26,49 @@ public class PermissionCacheTests(AccessApiFixture api)
     }
 
     [Fact]
-    public async Task Plan_change_invalidates_the_tenants_entries()
+    public async Task Plan_change_clears_the_tenants_entries_through_the_plan_changed_event()
     {
         var (tenantId, client) = await api.NewClientAsync("Pro", admin: false);
         (await ResolveAsync(tenantId, client.ClientId))!.MaxBatchSize.ShouldBe(5000);
 
         await using (var scope = api.Factory.Services.CreateAsyncScope())
         {
-            (await scope.ServiceProvider.GetRequiredService<CachedAccess>().ChangePlanAsync(tenantId, "Marketplace")).ShouldBeTrue();
+            (await scope.ServiceProvider.GetRequiredService<AccessService>().ChangePlanAsync(tenantId, "Marketplace")).ShouldBeTrue();
         }
 
-        var after = await ResolveAsync(tenantId, client.ClientId);
+        // Nothing touched Redis directly: the plan.changed event goes outbox -> RabbitMQ -> access.cache consumer.
+        var after = await AccessApiFixture.EventuallyAsync(() => ResolveAsync(tenantId, client.ClientId), a => a!.Plan == "Marketplace");
         after!.Plan.ShouldBe("Marketplace");
         after.MaxBatchSize.ShouldBe(1000);
+    }
+
+    [Fact]
+    public async Task Plan_change_writes_plan_changed_to_the_outbox_in_the_same_save()
+    {
+        var (tenantId, _) = await api.NewClientAsync("Free", admin: false);
+
+        await using var scope = api.Factory.Services.CreateAsyncScope();
+        (await scope.ServiceProvider.GetRequiredService<AccessService>().ChangePlanAsync(tenantId, "Pro")).ShouldBeTrue();
+
+        var db = scope.ServiceProvider.GetRequiredService<AccessDbContext>();
+        var row = await db.Outbox.SingleAsync(o => o.Type == "plan.changed" && o.Payload.Contains(tenantId.ToString()));
+        row.Payload.ShouldContain("\"oldPlan\":\"Free\"");
+        row.Payload.ShouldContain("\"newPlan\":\"Pro\"");
+    }
+
+    [Fact]
+    public async Task Handling_plan_changed_twice_is_harmless()
+    {
+        var (tenantId, client) = await api.NewClientAsync("Pro", admin: false);
+        var message = new BuildingBlocks.Messaging.IntegrationMessage(Guid.NewGuid(), "plan.changed",
+            $"{{\"tenantId\":\"{tenantId}\",\"oldPlan\":\"Pro\",\"newPlan\":\"Pro\",\"occurredAt\":\"2026-10-14T00:00:00Z\"}}");
+
+        await using var scope = api.Factory.Services.CreateAsyncScope();
+        var handler = scope.ServiceProvider.GetRequiredService<PlanChangedHandler>();
+        await handler.HandleAsync(message, CancellationToken.None);
+        await handler.HandleAsync(message, CancellationToken.None);
+
+        (await ResolveAsync(tenantId, client.ClientId))!.Plan.ShouldBe("Pro");
     }
 
     [Fact]
@@ -52,7 +82,7 @@ public class PermissionCacheTests(AccessApiFixture api)
         var access = await cached.ResolveAsync(tenantId, client.ClientId);
 
         access!.Plan.ShouldBe("Free");
-        (await cached.ChangePlanAsync(tenantId, "Pro")).ShouldBeTrue();
+        await cached.InvalidateTenantAsync(tenantId); // swallowed, logged
     }
 
     private async Task<EffectiveAccess?> ResolveAsync(Guid tenantId, string clientId)

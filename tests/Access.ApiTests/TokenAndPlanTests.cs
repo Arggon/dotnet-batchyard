@@ -56,14 +56,18 @@ public class TokenAndPlanTests(AccessApiFixture api)
     }
 
     [Fact]
-    public async Task Plan_change_applies_inside_access_at_once()
+    public async Task Plan_change_reaches_access_permissions_after_the_event()
     {
         using var http = await api.AuthorizedClientAsync("Pro", admin: true);
 
         (await http.PutAsJsonAsync("/v1/tenants/me/plan", new { plan = "Marketplace" })).StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        // Same (old) token: Access checks live assignments, so exports:read is granted now.
-        (await http.GetAsync(new Uri("/v1/exports/items", UriKind.Relative))).StatusCode.ShouldBe(HttpStatusCode.OK);
+        // Same (old) token: Access checks live (cached) assignments. The cache is cleared by the
+        // plan.changed consumer, so the new permission shows up within moments, not instantly.
+        var status = await AccessApiFixture.EventuallyAsync(
+            async () => (await http.GetAsync(new Uri("/v1/exports/items", UriKind.Relative))).StatusCode,
+            s => s == HttpStatusCode.OK);
+        status.ShouldBe(HttpStatusCode.OK);
         var me = await http.GetFromJsonAsync<JsonElement>("/v1/tenants/me");
         me.GetProperty("plan").GetString().ShouldBe("Marketplace");
         me.GetProperty("maxBatchSize").GetInt32().ShouldBe(1000);

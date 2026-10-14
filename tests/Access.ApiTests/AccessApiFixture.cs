@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
+using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
 
 namespace Access.ApiTests;
@@ -20,13 +21,15 @@ public sealed class AccessApiFixture : IAsyncLifetime
 
     private readonly RedisContainer _redis = new RedisBuilder("redis:7.4-alpine").Build();
 
+    private readonly RabbitMqContainer _rabbit = new RabbitMqBuilder("rabbitmq:4.1-management-alpine").Build();
+
     public string ConnectionString { get; private set; } = "";
     public string RedisConnectionString { get; private set; } = "";
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_container.StartAsync(), _redis.StartAsync());
+        await Task.WhenAll(_container.StartAsync(), _redis.StartAsync(), _rabbit.StartAsync());
         RedisConnectionString = _redis.GetConnectionString();
         ConnectionString = new SqlConnectionStringBuilder(_container.GetConnectionString()) { InitialCatalog = "batchyard_access" }.ConnectionString;
         Factory = CreateFactory(tokenRequestsPerMinute: 1000);
@@ -38,6 +41,8 @@ public sealed class AccessApiFixture : IAsyncLifetime
             host.UseSetting("ConnectionStrings:Access", ConnectionString);
             host.UseSetting("ConnectionStrings:Redis", RedisConnectionString);
             host.UseSetting("Jwt:SigningKey", SigningKey);
+            host.UseSetting("Messaging:Uri", _rabbit.GetConnectionString());
+            host.UseSetting("Messaging:PollInterval", "00:00:00.100");
             host.UseSetting("Access:WebhookSecret", WebhookSecret);
             host.UseSetting("Access:TokenRequestsPerMinute", tokenRequestsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture));
         });
@@ -60,11 +65,28 @@ public sealed class AccessApiFixture : IAsyncLifetime
         return http;
     }
 
+    /// <summary>Polls until <paramref name="done"/> holds or 20 s pass; plan changes reach the cache through RabbitMQ.</summary>
+    public static async Task<T> EventuallyAsync<T>(Func<Task<T>> probe, Func<T, bool> done)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (true)
+        {
+            var value = await probe();
+            if (done(value) || DateTime.UtcNow > deadline)
+            {
+                return value;
+            }
+
+            await Task.Delay(100);
+        }
+    }
+
     public async Task DisposeAsync()
     {
         await Factory.DisposeAsync();
         await _container.DisposeAsync();
         await _redis.DisposeAsync();
+        await _rabbit.DisposeAsync();
     }
 }
 
