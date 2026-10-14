@@ -73,6 +73,8 @@ flowchart LR
 - **Safe retries.** Send an `Idempotency-Key` header and a retried request gets the original response back. Reusing the key with a different body returns 409.
 - **The SQL is code.** Tables, the TVP type and the procedures live in [`db/ingest/`](db/ingest/) and are applied in order by DbUp.
 
+Full system view, now and planned: [docs/architecture.md](docs/architecture.md).
+
 Why it's built this way: [ADR 0001: TVP + MERGE](ArggonManager/docs/adr/0001-batch-upserts-via-tvp-and-merge.md) · [all ADRs](ArggonManager/docs/adr/)
 
 ## Tests and quality gates
@@ -109,7 +111,7 @@ db/ingest               Versioned SQL: tables, TVP type, stored procedures
 tests/                  Unit, integration (Testcontainers) and architecture tests
 benchmarks/             BenchmarkDotNet
 ArggonManager/          Specs, plans, tasks, ADRs, playbooks
-docs/                   Benchmarks, agentic workflow
+docs/                   Architecture, benchmarks, agentic workflow
 ```
 
 ## Roadmap
