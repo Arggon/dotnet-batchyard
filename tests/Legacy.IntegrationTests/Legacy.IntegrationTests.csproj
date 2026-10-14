@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Legacy.Monolith\Legacy.Monolith.csproj" />
+    <ProjectReference Include="..\..\src\Ingest.Data\Ingest.Data.csproj" />
+  </ItemGroup>
+</Project>
