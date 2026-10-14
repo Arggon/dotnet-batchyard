@@ -1,6 +1,8 @@
+using BuildingBlocks.Observability;
 using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddBatchyardTelemetry("gateway");
 
 // Routes and clusters come from configuration (appsettings.json, overridable by environment variables).
 // Moving a route between the monolith and a service = changing its ClusterId (ADR 0014).

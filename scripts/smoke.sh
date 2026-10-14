@@ -75,4 +75,5 @@ b=$(backend_of "$GATEWAY_URL/v1/reports/stock" -H "Authorization: Bearer $token"
 b=$(backend_of "$GATEWAY_URL/v1/payments" -H "Authorization: Bearer $token")
 [ "$b" = "payments" ] || { echo "gateway sent payments to '$b'" >&2; exit 1; }
 echo "gateway routes ok (batch -> ingest, report -> legacy, payments -> payments)"
+curl -fsS -o /dev/null http://localhost:18888 && echo "aspire dashboard up"
 echo "smoke test passed"

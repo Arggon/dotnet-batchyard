@@ -1,10 +1,12 @@
 using BuildingBlocks.Auth;
 using BuildingBlocks.Messaging;
+using BuildingBlocks.Observability;
 using Payments.Api;
 using Payments.Application;
 using Payments.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddBatchyardTelemetry("payments-api");
 
 var connectionString = builder.Configuration.GetConnectionString("Payments")
     ?? throw new InvalidOperationException("Connection string 'Payments' is not configured.");

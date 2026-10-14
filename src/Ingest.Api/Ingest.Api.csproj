@@ -6,4 +6,7 @@
     <ProjectReference Include="..\BuildingBlocks\BuildingBlocks.csproj" />
     <ProjectReference Include="..\Ingest.Data\Ingest.Data.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BuildingBlocks.Observability\BuildingBlocks.Observability.csproj" />
+  </ItemGroup>
 </Project>

@@ -129,13 +129,14 @@ public sealed class SqlEventOutbox(PaymentsDb db, TimeProvider clock) : IEventOu
     {
         var connection = await db.ConnectionAsync(ct);
         await connection.ExecuteAsync(new CommandDefinition(
-            "INSERT INTO dbo.Outbox (Id, Type, Payload, OccurredAt) VALUES (@Id, @type, @Payload, @OccurredAt)",
+            "INSERT INTO dbo.Outbox (Id, Type, Payload, OccurredAt, TraceParent) VALUES (@Id, @type, @Payload, @OccurredAt, @TraceParent)",
             new
             {
                 Id = Guid.NewGuid(),
                 type,
                 Payload = JsonSerializer.Serialize(payload, payload.GetType(), JsonSerializerOptions.Web),
                 OccurredAt = clock.GetUtcNow().UtcDateTime,
+                TraceParent = BuildingBlocks.Messaging.MessagingTelemetry.CurrentTraceParent,
             },
             db.Transaction,
             cancellationToken: ct));

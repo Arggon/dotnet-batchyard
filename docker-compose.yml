@@ -21,6 +21,8 @@ services:
       context: .
       dockerfile: src/Ingest.Api/Dockerfile
     environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "ingest-api"
       ConnectionStrings__Ingest: "Server=sqlserver,1433;Database=batchyard;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
       Ingest__MaxBatchSize: "5000"
       Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
@@ -44,6 +46,8 @@ services:
       context: .
       dockerfile: src/Access.Api/Dockerfile
     environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "access-api"
       ConnectionStrings__Access: "Server=sqlserver,1433;Database=batchyard_access;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
       ConnectionStrings__Redis: "redis:6379"
       Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
@@ -79,6 +83,8 @@ services:
       context: .
       dockerfile: src/Payments.Api/Dockerfile
     environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "payments-api"
       ConnectionStrings__Payments: "Server=sqlserver,1433;Database=batchyard_payments;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
       Messaging__Uri: "amqp://guest:guest@rabbitmq:5672"
       Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
@@ -97,6 +103,8 @@ services:
       context: .
       dockerfile: src/Legacy.Monolith/Dockerfile
     environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "legacy-monolith"
       ConnectionStrings__Items: "Server=sqlserver,1433;Database=batchyard;User Id=sa;Password=Local_dev_only_1;TrustServerCertificate=True"
       Jwt__SigningKey: "local-dev-only-signing-key-change-me-0123456789"
     ports:
@@ -115,6 +123,8 @@ services:
       context: .
       dockerfile: src/Gateway/Dockerfile
     environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18889"
+      OTEL_SERVICE_NAME: "gateway"
       ReverseProxy__Clusters__ingest__Destinations__d1__Address: "http://ingest-api:8080/"
       ReverseProxy__Clusters__access__Destinations__d1__Address: "http://access-api:8080/"
       ReverseProxy__Clusters__payments__Destinations__d1__Address: "http://payments-api:8080/"
@@ -126,3 +136,11 @@ services:
       - access-api
       - payments-api
       - legacy-monolith
+
+  aspire-dashboard:
+    # Traces, metrics and logs from every service (ADR 0016). UI: http://localhost:18888 (no login, local only).
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.0
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "18888:18888"

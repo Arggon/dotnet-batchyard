@@ -128,6 +128,7 @@ public sealed class AccessService(AccessDbContext db, TimeProvider clock)
             Type = PlanChangedEvent.Type,
             Payload = JsonSerializer.Serialize(new PlanChangedEvent(tenantId, oldPlan, plan.Code, now), JsonSerializerOptions.Web),
             OccurredAt = now,
+            TraceParent = BuildingBlocks.Messaging.MessagingTelemetry.CurrentTraceParent,
         });
 
         await db.SaveChangesAsync(ct);

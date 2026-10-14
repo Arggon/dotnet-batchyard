@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 id: task-m4-otel
 title: "OpenTelemetry tracing"
 parent: m4-observability

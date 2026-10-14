@@ -5,7 +5,7 @@ namespace BuildingBlocks.Messaging;
 
 /// <summary>
 /// Reads and settles rows of a service's dbo.Outbox table. Every service uses the same table shape:
-/// Id, Type, Payload, OccurredAt, PublishedAt, Attempts.
+/// Id, Type, Payload, OccurredAt, PublishedAt, Attempts, TraceParent.
 /// </summary>
 public sealed class SqlOutboxStore(string connectionString)
 {
@@ -22,7 +22,7 @@ public sealed class SqlOutboxStore(string connectionString)
 
         var rows = (await connection.QueryAsync<IntegrationMessage>(new CommandDefinition(
             """
-            SELECT TOP (@batchSize) Id, Type, Payload
+            SELECT TOP (@batchSize) Id, Type, Payload, TraceParent
             FROM dbo.Outbox WITH (UPDLOCK, READPAST, ROWLOCK)
             WHERE PublishedAt IS NULL
             ORDER BY OccurredAt

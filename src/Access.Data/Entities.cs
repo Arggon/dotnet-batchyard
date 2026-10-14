@@ -62,4 +62,5 @@ public sealed class OutboxRow
     public DateTime OccurredAt { get; set; }
     public DateTime? PublishedAt { get; set; }
     public int Attempts { get; set; }
+    public string? TraceParent { get; set; }
 }

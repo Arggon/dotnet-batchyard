@@ -2,4 +2,7 @@
   <ItemGroup>
     <PackageReference Include="Yarp.ReverseProxy" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BuildingBlocks.Observability\BuildingBlocks.Observability.csproj" />
+  </ItemGroup>
 </Project>

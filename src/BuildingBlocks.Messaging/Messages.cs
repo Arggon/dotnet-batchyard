@@ -1,7 +1,34 @@
+using System.Diagnostics;
+
 namespace BuildingBlocks.Messaging;
 
-/// <summary>An integration event. <see cref="Type"/> doubles as the RabbitMQ routing key.</summary>
-public sealed record IntegrationMessage(Guid Id, string Type, string Payload);
+/// <summary>
+/// An integration event. <see cref="Type"/> doubles as the RabbitMQ routing key. <see cref="TraceParent"/> is the
+/// W3C trace context of the request that caused it, so one trace runs from that request to every consumer (ADR 0016).
+/// </summary>
+public sealed record IntegrationMessage(Guid Id, string Type, string Payload, string? TraceParent = null);
+
+/// <summary>The ActivitySource for publish and consume spans. Plain System.Diagnostics; no OpenTelemetry dependency here.</summary>
+public static class MessagingTelemetry
+{
+    public const string SourceName = "Batchyard.Messaging";
+    public const string TraceParentHeader = "traceparent";
+
+    public static readonly ActivitySource Source = new(SourceName);
+
+    /// <summary>The current trace context to store with an outbox row (null when nothing is tracing).</summary>
+    public static string? CurrentTraceParent => Activity.Current?.Id;
+
+    internal static Activity? Start(string name, ActivityKind kind, string? traceParent, IntegrationMessage message)
+    {
+        ActivityContext.TryParse(traceParent, null, out var parent);
+        var activity = Source.StartActivity(name, kind, parent);
+        activity?.SetTag("messaging.system", "rabbitmq");
+        activity?.SetTag("messaging.destination.name", message.Type);
+        activity?.SetTag("messaging.message.id", message.Id.ToString());
+        return activity;
+    }
+}
 
 /// <summary>Settings shared by the publisher and consumers.</summary>
 public sealed class MessagingOptions

@@ -1,7 +1,9 @@
 using BuildingBlocks.Auth;
+using BuildingBlocks.Observability;
 using Legacy.Monolith;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddBatchyardTelemetry("legacy-monolith");
 
 // Shares the items database with ingest-svc during the migration; ingest's DbUp scripts own the schema (ADR 0015).
 var connectionString = builder.Configuration.GetConnectionString("Items")

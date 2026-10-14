@@ -37,7 +37,7 @@ You only need Docker:
 docker compose up --build
 ```
 
-This starts SQL Server, Redis, RabbitMQ (management UI on port 15672, guest/guest), the access service (port 8081), the ingest service (port 8080), the payments service (port 8082), the legacy monolith (port 8083) and the YARP gateway (port 8000) in front of all of them. Every example below also works through the gateway: swap the port for 8000. It also seeds a demo tenant on the Pro plan, with an API client whose credentials are local-only values from `docker-compose.yml`.
+This starts SQL Server, Redis, RabbitMQ (management UI on port 15672, guest/guest), the access service (port 8081), the ingest service (port 8080), the payments service (port 8082), the legacy monolith (port 8083), the YARP gateway (port 8000) in front of all of them, and the Aspire dashboard for traces, metrics and logs (http://localhost:18888). Every example below also works through the gateway: swap the port for 8000. It also seeds a demo tenant on the Pro plan, with an API client whose credentials are local-only values from `docker-compose.yml`.
 
 Get a token, then send a batch with one valid and one invalid row:
 
@@ -115,6 +115,10 @@ flowchart LR
 
   Ranges cover two runs. At 50 items per request the p50 gap is 80%. The gateway hop cost under 1 ms at p50. The win comes from the set-based data path that the extraction made safe to ship. [Details and caveats](docs/benchmarks.md#monolith-vs-extracted-service-k6-m4)
 
+## Tracing
+
+Every service and the gateway send traces, metrics and logs over OpenTelemetry (OTLP) to the standalone Aspire dashboard in compose ([ADR 0016](ArggonManager/docs/adr/0016-opentelemetry-aspire-dashboard.md)). A capture is meant to show up as one trace: gateway → payments-api → SQL → `payment.captured publish` → `payment.captured process` in the read-model consumer. The trace context is stored with the outbox row and carried in a `traceparent` RabbitMQ header, so the trace survives the gap between the request and the background dispatcher. An integration test checks the request → publish → consume part: both messaging spans carry the caller's trace id. The dashboard view itself is not checked in CI (the smoke test only checks the dashboard is up). Export is off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
 ## How access works
 
 | Plan | Roles it grants | What that allows |
@@ -176,7 +180,7 @@ dotnet test   # needs Docker for the integration tests
 
 ## Stack
 
-.NET 10 · ASP.NET Core Minimal APIs · SQL Server 2022 · Dapper · EF Core · DbUp · JWT · Redis · RabbitMQ · Polly · YARP · xUnit + Shouldly · Testcontainers · BenchmarkDotNet · k6 · Docker Compose · GitHub Actions
+.NET 10 · ASP.NET Core Minimal APIs · SQL Server 2022 · Dapper · EF Core · DbUp · JWT · Redis · RabbitMQ · Polly · YARP · OpenTelemetry · xUnit + Shouldly · Testcontainers · BenchmarkDotNet · k6 · Docker Compose · GitHub Actions
 
 ## How it was built
 
@@ -200,6 +204,7 @@ src/Payments.Data       Dapper repositories, outbox writer, read-model consumer,
 src/Gateway             YARP routes and clusters in config, X-Backend header
 src/Legacy.Monolith     The "before": plain ADO.NET, per-row SQL, a legacy-only stock report
 src/BuildingBlocks      Shared JWT validation and the permission filter (no framework)
+src/BuildingBlocks.Observability  OpenTelemetry setup shared by every service
 src/BuildingBlocks.Messaging  Outbox dispatcher, RabbitMQ publisher (confirms) and consumer
 db/ingest, db/access, db/payments  Versioned SQL: tables, TVP type, procedures, catalog, outbox
 tests/                  Unit, integration (Testcontainers) and architecture tests
@@ -214,7 +219,7 @@ docs/                   Architecture, benchmarks, agentic workflow
 - **M1, done:** skeleton, CI with coverage, compose, ingest batch endpoint, integration tests, BenchmarkDotNet + demo client + k6 numbers, architecture diagrams
 - **M2, done:** access service with plans, roles and permissions, JWT login, authorization matrices, Redis cache. Ingest now takes the tenant from the token
 - **M3, done:** payments service with commands and queries, a hand-written mediator, idempotent capture, outbox + RabbitMQ, a read model. Access clears its cache on `plan.changed`
-- **M4, in progress:** legacy monolith, YARP strangler gateway and the k6 comparison are in; OpenTelemetry next
+- **M4, done:** legacy monolith, YARP strangler gateway, k6 comparison, OpenTelemetry tracing to the Aspire dashboard
 
 ## License
 

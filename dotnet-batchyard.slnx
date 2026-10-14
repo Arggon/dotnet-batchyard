@@ -6,6 +6,7 @@
     <Project Path="src/Access.Api/Access.Api.csproj" />
     <Project Path="src/Access.Data/Access.Data.csproj" />
     <Project Path="src/BuildingBlocks.Messaging/BuildingBlocks.Messaging.csproj" />
+    <Project Path="src/BuildingBlocks.Observability/BuildingBlocks.Observability.csproj" />
     <Project Path="src/BuildingBlocks/BuildingBlocks.csproj" />
     <Project Path="src/Gateway/Gateway.csproj" />
     <Project Path="src/Ingest.Api/Ingest.Api.csproj" />

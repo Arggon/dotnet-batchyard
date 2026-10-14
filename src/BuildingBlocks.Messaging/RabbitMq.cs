@@ -59,6 +59,8 @@ public sealed class RabbitMqPublisher(RabbitMqConnection connection) : IMessageP
     public async Task PublishAsync(IntegrationMessage message, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(message);
+        // Continue the trace of the request that wrote the outbox row.
+        using var activity = MessagingTelemetry.Start($"{message.Type} publish", System.Diagnostics.ActivityKind.Producer, message.TraceParent, message);
         await _gate.WaitAsync(ct);
         try
         {
@@ -76,6 +78,10 @@ public sealed class RabbitMqPublisher(RabbitMqConnection connection) : IMessageP
                 Type = message.Type,
                 ContentType = "application/json",
                 DeliveryMode = DeliveryModes.Persistent,
+                Headers = new Dictionary<string, object?>
+                {
+                    [MessagingTelemetry.TraceParentHeader] = activity?.Id ?? message.TraceParent,
+                },
             };
             // With confirmation tracking on, this throws if the broker nacks or the message is unroutable.
             await _channel.BasicPublishAsync(connection.Options.Exchange, message.Type, mandatory: false, props,
@@ -149,10 +155,15 @@ public sealed partial class RabbitMqConsumer<THandler>(
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (_, delivery) =>
         {
+            var traceParent = delivery.BasicProperties.Headers?.TryGetValue(MessagingTelemetry.TraceParentHeader, out var raw) == true
+                ? raw switch { byte[] bytes => Encoding.UTF8.GetString(bytes), string text => text, _ => null }
+                : null;
             var message = new IntegrationMessage(
                 Guid.TryParse(delivery.BasicProperties.MessageId, out var id) ? id : Guid.NewGuid(),
                 delivery.RoutingKey,
-                Encoding.UTF8.GetString(delivery.Body.Span));
+                Encoding.UTF8.GetString(delivery.Body.Span),
+                traceParent);
+            using var activity = MessagingTelemetry.Start($"{message.Type} process", System.Diagnostics.ActivityKind.Consumer, traceParent, message);
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
@@ -161,6 +172,7 @@ public sealed partial class RabbitMqConsumer<THandler>(
             }
             catch (Exception ex)
             {
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
                 LogHandlerFailed(logger, message.Type, message.Id, ex);
                 await _channel.BasicNackAsync(delivery.DeliveryTag, false, requeue: !delivery.Redelivered, ct);
             }

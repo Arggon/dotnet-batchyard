@@ -1,8 +1,10 @@
 using BuildingBlocks.Auth;
+using BuildingBlocks.Observability;
 using Ingest.Api.Items;
 using Ingest.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddBatchyardTelemetry("ingest-api");
 
 var connectionString = builder.Configuration.GetConnectionString("Ingest")
     ?? throw new InvalidOperationException("Connection string 'Ingest' is not configured.");

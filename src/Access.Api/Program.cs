@@ -3,9 +3,11 @@ using Access.Api;
 using Access.Data;
 using BuildingBlocks.Auth;
 using BuildingBlocks.Messaging;
+using BuildingBlocks.Observability;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddBatchyardTelemetry("access-api");
 
 var connectionString = builder.Configuration.GetConnectionString("Access")
     ?? throw new InvalidOperationException("Connection string 'Access' is not configured.");

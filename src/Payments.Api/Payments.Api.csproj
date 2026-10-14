@@ -7,4 +7,7 @@
     <ProjectReference Include="..\Payments.Application\Payments.Application.csproj" />
     <ProjectReference Include="..\Payments.Data\Payments.Data.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BuildingBlocks.Observability\BuildingBlocks.Observability.csproj" />
+  </ItemGroup>
 </Project>

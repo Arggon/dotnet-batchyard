@@ -115,7 +115,7 @@ flowchart LR
     sql[(SQL Server)]
     redis[(Redis)]
     mq{{RabbitMQ<br/>payment.captured, plan.changed<br/>ingest.completed planned}}
-    otel["OpenTelemetry → Aspire dashboard"]:::planned
+    otel["OpenTelemetry → Aspire dashboard"]
 
     client --> gw
     gw --> ingest
@@ -132,6 +132,7 @@ flowchart LR
     access -->|outbox| mq
     mq --> access
     mq --> payments
+    gw -.->|OTLP, every service| otel
 
     classDef planned stroke-dasharray: 5 5
 ```
@@ -141,6 +142,6 @@ flowchart LR
 | M1 ✅ | Ingest service, SQL Server, compose, CI |
 | M2 ✅ | Access service, JWT, Redis permission cache |
 | M3 ✅ | Payments service, mediator, outbox + RabbitMQ, read model, plan.changed |
-| M4 | Legacy monolith ✅, YARP gateway ✅, k6 comparison ✅, OpenTelemetry |
+| M4 ✅ | Legacy monolith, YARP gateway, k6 comparison, OpenTelemetry |
 
 Decisions behind these choices are in [ArggonManager/docs/adr](../ArggonManager/docs/adr/).
