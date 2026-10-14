@@ -1,8 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Testcontainers.MsSql" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Ingest.Api\Ingest.Api.csproj" />
     <ProjectReference Include="..\..\src\Ingest.Data\Ingest.Data.csproj" />
   </ItemGroup>
 </Project>
