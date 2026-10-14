@@ -114,7 +114,7 @@ flowchart LR
     legacy["Legacy.Monolith<br/>the before"]
     sql[(SQL Server)]
     redis[(Redis)]
-    mq{{RabbitMQ<br/>payment.captured, plan.changed<br/>ingest.completed planned}}
+    mq{{RabbitMQ<br/>payment.captured, plan.changed, ingest.completed}}
     otel["OpenTelemetry → Aspire dashboard"]
 
     client --> gw
@@ -127,7 +127,7 @@ flowchart LR
     access --> sql
     access --> redis
     payments --> sql
-    ingest -.->|outbox| mq
+    ingest -->|outbox| mq
     payments -->|outbox| mq
     access -->|outbox| mq
     mq --> access

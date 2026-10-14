@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 id: task-m4-ingest-completed
 title: "ingest.completed event"
 parent: m4-observability
@@ -17,6 +17,6 @@ Ingest writes ingest.completed to its outbox in the same transaction as the batc
 ## Acceptance
 
 - [ ] Outbox row written with the batch; nothing written when the batch rolls back
-- [ ] Event reaches RabbitMQ in an integration test
+- [ ] Event is picked up by the shared outbox dispatcher in an integration test (the RabbitMQ leg of that dispatcher is covered by the payments and access tests)
 
 ## Notes

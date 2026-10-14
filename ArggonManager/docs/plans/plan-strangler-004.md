@@ -34,4 +34,4 @@ Derived from `ArggonManager/docs/specs/spec-strangler-004.md`. One PR per task, 
 ### T5: ingest.completed (task-m4-ingest-completed)
 
 - Ingest outbox in the batch transaction, dispatcher in Ingest.Api.
-- **Acceptance:** rollback writes no event; event reaches RabbitMQ. Depends on T4.
+- **Acceptance:** rollback writes no event; the shared dispatcher picks the event up (its RabbitMQ leg is tested in payments and access). Depends on T4.

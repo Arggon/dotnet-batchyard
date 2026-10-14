@@ -93,7 +93,7 @@ public static class ItemEndpoints
         }
 
         // One round trip for every valid row; invalid rows never reach the database.
-        foreach (var stored in await repository.UpsertBatchAsync(tenantId, valid, cancellationToken))
+        foreach (var stored in await repository.UpsertBatchAsync(tenantId, valid, items.Count - valid.Count, cancellationToken))
         {
             var i = originalIndex[stored.Index];
             var sku = valid[stored.Index].Sku;

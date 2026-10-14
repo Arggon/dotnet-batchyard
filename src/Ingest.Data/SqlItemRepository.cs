@@ -1,4 +1,6 @@
 using System.Data;
+using System.Diagnostics;
+using System.Text.Json;
 using Dapper;
 using Microsoft.Data.SqlClient;
 
@@ -29,7 +31,7 @@ public sealed class SqlItemRepository(string connectionString) : IItemRepository
     }
 
     public async Task<IReadOnlyList<BatchRowResult>> UpsertBatchAsync(
-        Guid tenantId, IReadOnlyList<ItemRow> items, CancellationToken cancellationToken = default)
+        Guid tenantId, IReadOnlyList<ItemRow> items, int rejectedBeforeDb = 0, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(items);
         if (items.Count == 0)
@@ -39,13 +41,39 @@ public sealed class SqlItemRepository(string connectionString) : IItemRepository
 
         using var table = ToTable(items);
         await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var tx = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
         var rows = await connection.QueryAsync<(int RowIndex, string Outcome)>(new CommandDefinition(
             "dbo.usp_UpsertItemsBatch",
             new { TenantId = tenantId, Rows = table.AsTableValuedParameter("dbo.ItemBatchRow") },
+            tx,
             commandType: CommandType.StoredProcedure,
             commandTimeout: 120,
             cancellationToken: cancellationToken));
-        return [.. rows.Select(r => new BatchRowResult(r.RowIndex, ParseOutcome(r.Outcome)))];
+        BatchRowResult[] results = [.. rows.Select(r => new BatchRowResult(r.RowIndex, ParseOutcome(r.Outcome)))];
+
+        // ingest.completed rides in the same transaction as the upsert: no event for a rolled-back batch (ADR 0017).
+        var now = DateTime.UtcNow;
+        var evt = new IngestCompletedEvent(
+            tenantId,
+            results.Count(r => r.Outcome == UpsertOutcome.Created),
+            results.Count(r => r.Outcome == UpsertOutcome.Updated),
+            rejectedBeforeDb + results.Count(r => r.Outcome == UpsertOutcome.DuplicateInBatch),
+            now);
+        await connection.ExecuteAsync(new CommandDefinition(
+            "INSERT INTO dbo.Outbox (Id, Type, Payload, OccurredAt, TraceParent) VALUES (@Id, @Type, @Payload, @now, @TraceParent)",
+            new
+            {
+                Id = Guid.NewGuid(),
+                Type = IngestCompletedEvent.Type,
+                Payload = JsonSerializer.Serialize(evt, JsonSerializerOptions.Web),
+                now,
+                TraceParent = Activity.Current?.Id,
+            },
+            tx,
+            cancellationToken: cancellationToken));
+        await tx.CommitAsync(cancellationToken);
+        return results;
     }
 
     public async Task<ItemRow?> FindAsync(Guid tenantId, string sku, CancellationToken cancellationToken = default)
@@ -83,4 +111,10 @@ public sealed class SqlItemRepository(string connectionString) : IItemRepository
         "duplicate" => UpsertOutcome.DuplicateInBatch,
         _ => throw new InvalidOperationException($"Unknown upsert outcome '{outcome}'."),
     };
+}
+
+/// <summary>Published after a committed batch: counts only, no item data (ADR 0017).</summary>
+public sealed record IngestCompletedEvent(Guid TenantId, int Created, int Updated, int Rejected, DateTime OccurredAt)
+{
+    public const string Type = "ingest.completed";
 }

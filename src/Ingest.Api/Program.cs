@@ -1,4 +1,5 @@
 using BuildingBlocks.Auth;
+using BuildingBlocks.Messaging;
 using BuildingBlocks.Observability;
 using Ingest.Api.Items;
 using Ingest.Data;
@@ -12,6 +13,13 @@ var connectionString = builder.Configuration.GetConnectionString("Ingest")
 builder.Services.Configure<IngestOptions>(builder.Configuration.GetSection(IngestOptions.Section));
 builder.Services.AddSingleton<IItemRepository>(_ => new SqlItemRepository(connectionString));
 builder.Services.AddSingleton<IIdempotencyStore>(_ => new SqlIdempotencyStore(connectionString));
+// ingest.completed: the batch transaction writes it to dbo.Outbox; this publishes it (ADR 0017).
+if (builder.Configuration.GetValue("Messaging:Enabled", true))
+{
+    builder.Services.AddBatchyardMessaging(builder.Configuration.GetSection("Messaging").Get<MessagingOptions>() ?? new MessagingOptions());
+    builder.Services.AddOutboxDispatcher(connectionString);
+}
+
 builder.Services.AddBatchyardJwt(builder.Configuration);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

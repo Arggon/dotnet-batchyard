@@ -2,6 +2,8 @@
 
 All numbers on this page were measured in this repo. None are copied from the CV.
 
+> **Note (M4):** since `ingest.completed` (ADR 0017), the batch path also writes one outbox row per request inside its transaction. All numbers on this page were measured before that change; it adds one small INSERT per request, not per row, and has not been re-measured yet.
+
 ## Monolith vs extracted service (k6, M4)
 
 The same load against the legacy monolith (one `SELECT` plus one `INSERT` per row) and against ingest-svc (one TVP, one `MERGE`), then against ingest-svc through the YARP gateway. Script: [`benchmarks/k6/strangler.js`](../benchmarks/k6/strangler.js). 5 VUs, 30 s per target, JWT auth on, every row a new insert.
