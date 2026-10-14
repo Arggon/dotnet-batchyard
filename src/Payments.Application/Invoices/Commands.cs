@@ -86,12 +86,15 @@ public sealed class CapturePaymentHandler(
             ?? throw new NotFoundException($"Invoice {request.InvoiceId} not found.");
         invoice.MarkPaid();
 
+        // Claim the invoice before charging: the version check (and the row lock it takes) means a
+        // concurrent capture fails here, before it can reach the gateway.
+        await invoices.UpdateStatusAsync(invoice, cancellationToken);
+
         var charge = await gateway.ChargeAsync(key, invoice.Total, cancellationToken);
         var now = clock.GetUtcNow().UtcDateTime;
         var payment = new Payment(Guid.NewGuid(), request.TenantId, invoice.Id, PaymentKind.Capture, invoice.Total, key, charge.Reference, now);
 
         await payments.AddAsync(payment, cancellationToken);
-        await invoices.UpdateStatusAsync(invoice, cancellationToken);
         await outbox.AddAsync("payment.captured",
             new PaymentEvent(payment.Id, payment.TenantId, invoice.Id, "capture", invoice.Total.Amount, invoice.Total.Currency, now), cancellationToken);
 
@@ -129,13 +132,13 @@ public sealed class RefundPaymentHandler(
         var invoice = await invoices.GetAsync(request.TenantId, capture.InvoiceId, cancellationToken)
             ?? throw new NotFoundException($"Invoice {capture.InvoiceId} not found.");
         invoice.MarkRefunded();
+        await invoices.UpdateStatusAsync(invoice, cancellationToken);
 
         var refund = await gateway.RefundAsync(key, capture.GatewayReference, capture.Amount, cancellationToken);
         var now = clock.GetUtcNow().UtcDateTime;
         var payment = new Payment(Guid.NewGuid(), request.TenantId, invoice.Id, PaymentKind.Refund, capture.Amount, key, refund.Reference, now);
 
         await payments.AddAsync(payment, cancellationToken);
-        await invoices.UpdateStatusAsync(invoice, cancellationToken);
         await outbox.AddAsync("payment.refunded",
             new PaymentEvent(payment.Id, payment.TenantId, invoice.Id, "refund", capture.Amount.Amount, capture.Amount.Currency, now), cancellationToken);
 

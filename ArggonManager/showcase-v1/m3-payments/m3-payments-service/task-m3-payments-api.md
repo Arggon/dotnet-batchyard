@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 id: task-m3-payments-api
 title: "Payments data, idempotent capture and API"
 parent: m3-payments-service

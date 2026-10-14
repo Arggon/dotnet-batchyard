@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 id: task-m3-mediator
 title: "Mediator, commands and queries"
 parent: m3-payments-service
