@@ -1,6 +1,6 @@
 # Architecture
 
-Two views: the system as it is today (milestone 1), and the full target from the roadmap. Solid boxes exist in the code; dashed boxes are planned.
+Two views: the system as it is today (milestone 2), and the full target from the roadmap. Solid boxes exist in the code; dashed boxes are planned.
 
 ## Today (M2)
 
