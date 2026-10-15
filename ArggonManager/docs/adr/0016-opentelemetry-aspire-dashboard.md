@@ -16,6 +16,7 @@ A request now crosses a gateway, up to three services, SQL Server and RabbitMQ. 
 
 - No exporter configured means no export, so tests and `dotnet run` stay quiet.
 - The dashboard keeps data in memory only; it is a dev tool, not a backend.
+- CI reads the dashboard's telemetry HTTP API (`/api/telemetry/*`, Aspire 13.2+, image pinned to 13.6.1) after the smoke test, so a broken exporter or a lost `traceparent` fails the build (`scripts/check-traces.py`). The API is open because compose runs the dashboard with anonymous access; it binds to 127.0.0.1 only.
 
 ## Alternatives considered
 
