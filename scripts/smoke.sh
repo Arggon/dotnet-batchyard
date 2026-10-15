@@ -45,6 +45,12 @@ echo "$response"
 echo "$response" | grep -q '"created":1' && echo "$response" | grep -q '"rejected":1'
 echo "ingest ok"
 
+# ingest.completed: the batch above goes outbox -> RabbitMQ -> access.usage consumer (ADR 0018).
+usage_seen() { curl -fsS "$ACCESS_URL/v1/tenants/me/usage" -H "Authorization: Bearer $token" | grep -q '"batches":[1-9]'; }
+for _ in $(seq 1 30); do usage_seen && break; sleep 1; done
+usage_seen || { echo "ingest.completed never reached the access usage meter" >&2; exit 1; }
+echo "usage meter updated via RabbitMQ"
+
 # The legacy monolith writes the same table with the same contract.
 legacy=$(curl -fsS -X POST "$LEGACY_URL/v1/items:batch" -H "Content-Type: application/json" -H "Authorization: Bearer $token" \
   -d "{\"items\":[{\"sku\":\"LEG-$run\",\"name\":\"Spark plug\",\"price\":3,\"currency\":\"USD\",\"quantity\":10}]}")

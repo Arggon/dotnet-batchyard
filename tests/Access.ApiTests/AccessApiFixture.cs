@@ -58,6 +58,11 @@ public sealed class AccessApiFixture : IAsyncLifetime
     public async Task<HttpClient> AuthorizedClientAsync(string plan, bool admin)
     {
         var (_, client) = await NewClientAsync(plan, admin);
+        return await AuthorizedClientAsync(client);
+    }
+
+    public async Task<HttpClient> AuthorizedClientAsync(NewClient client)
+    {
         var http = Factory.CreateClient();
         var token = await http.PostAsJsonAsync("/v1/auth/token", new { client.ClientId, client.ClientSecret });
         var body = await token.Content.ReadFromJsonAsync<TokenResponse>();

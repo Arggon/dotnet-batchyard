@@ -10,11 +10,13 @@ public sealed record TokenRequest(string? ClientId, string? ClientSecret);
 public sealed record TokenResponse(string AccessToken, string TokenType, int ExpiresIn);
 public sealed record PlanChangeRequest(string? Plan);
 public sealed record MarketplaceEvent(Guid TenantId, string? Event);
+public sealed record UsageView(Guid TenantId, int WindowDays, IReadOnlyList<UsageDay> Days);
 public sealed record TenantView(Guid TenantId, string Plan, IReadOnlyList<string> Roles, IReadOnlyList<string> Permissions, int? MaxBatchSize);
 
 public static class AccessEndpoints
 {
     public const string TokenRateLimitPolicy = "token";
+    public const int UsageWindowDays = 30;
 
     public static IEndpointRouteBuilder MapAccessEndpoints(this IEndpointRouteBuilder app)
     {
@@ -25,6 +27,8 @@ public static class AccessEndpoints
 
         var tenant = app.MapGroup("/v1/tenants/me").WithTags("Tenant");
         tenant.MapGet("", GetMe).RequirePermission("items:read").WithSummary("The caller's tenant, plan and effective permissions.");
+        tenant.MapGet("usage", GetUsage).RequirePermission("items:read")
+            .WithSummary("Items ingested per UTC day over the last 30 days, from ingest.completed events (eventually consistent).");
         tenant.MapPut("plan", ChangePlan).RequirePermission("plan:manage").WithSummary("Move the tenant to another plan.");
 
         app.MapGet("/v1/exports/items", () => Results.Ok(new { message = "Exports are a placeholder in v1; this endpoint only proves the exports:read permission." }))
@@ -62,6 +66,13 @@ public static class AccessEndpoints
         return me is null
             ? Results.NotFound()
             : Results.Ok(new TenantView(me.TenantId, me.Plan, me.Roles, me.Permissions, me.MaxBatchSize));
+    }
+
+    private static async Task<IResult> GetUsage(HttpContext http, UsageQueries usage, TimeProvider clock)
+    {
+        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+        var days = await usage.LastDaysAsync(http.User.TenantId(), today, UsageWindowDays, http.RequestAborted);
+        return Results.Ok(new UsageView(http.User.TenantId(), UsageWindowDays, days));
     }
 
     private static async Task<IResult> ChangePlan(PlanChangeRequest request, HttpContext http, AccessService access)
